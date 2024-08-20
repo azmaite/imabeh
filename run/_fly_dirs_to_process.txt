@@ -1,8 +1,5 @@
-# user and fly dirs to be selected for preprocessing and which tasks to run on them
+# fly dirs to be selected for preprocessing and which tasks to run on them
 # for example config see 'run/_fly_dirs_to_process_example.txt'
-
-# current user - must match existing dictionary in 'run/userpaths.py'
-CURRENT_USER = USER_MA_2p2
 
 # files to process and tasks
 # only give relative path within 'labserver_data' folder as found in 'run/userpaths.py'

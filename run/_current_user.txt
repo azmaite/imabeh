@@ -1,0 +1,5 @@
+# current user of the processing pipelines
+# determines the scope used and the location of the data within the labserver
+# must match existing dictionary in 'run/userpaths.py'
+
+CURRENT_USER = USER_MA_2p2
