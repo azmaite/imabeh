@@ -15,11 +15,9 @@ LOCAL_DIR, _ = os.path.split(os.path.realpath(__file__))
 # location of the labserver files and data paths
 GLOBAL_PATHS = {
     "labserver_files": "/mnt/upramdya_files",
-    "labserver_data": "/mnt/upramdya_data"
-}
+    "labserver_data": "/mnt/upramdya_data",
 
-# paths to different folders within each trial (to append to each trial path)
-GENERAL_PATHS = {
+    # paths to different folders within each trial (to append to each trial path)
     "2p_path": "/2p",
     "septacam_path": "/behData/images",
     "fictrac_path": "/behData/fictrac",
