@@ -1,0 +1,21 @@
+# user and fly dirs to be selected for preprocessing and which tasks to run on them
+# example configs below.
+
+# Current user - must match existing dictionary in 'run/userpaths.py'
+# Example:
+CURRENT_USER = USER_MA_2p2
+
+# Files to process and tasks
+# only give relative path within 'labserver_data' folder as found in 'run/userpaths.py'
+# General format:
+# experiment_path/Fly#||selected trials (a comma separated list of the beginning sequence of the trials without spaces)||task1,task2,!task3
+# to run a pipeline of tasks (as defined in 'run/pipelines.py'), use the pipeline name starting with 'p_' (i.e. p_PipelineName)
+# if a task/pipeline is to be run again even if it has previously been completed, place a '!' before the task name
+
+#Examples:
+240729_T-36_Ablation/Fly2||002_pre-beh,004_post-beh||p_AblationPipeline
+240621_T-17_MDN-GCaMP6f/Fly1||002_pre-beh||!fictrac,df3d
+240215_T-36_Ablation/Fly1||003_post-beh,005_post-beh||!p_AblationPipeline,df3d
+
+
+

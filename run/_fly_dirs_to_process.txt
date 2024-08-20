@@ -1,0 +1,14 @@
+# user and fly dirs to be selected for preprocessing and which tasks to run on them
+# for example config see 'run/_fly_dirs_to_process_example.txt'
+
+# current user - must match existing dictionary in 'run/userpaths.py'
+CURRENT_USER = USER_MA_2p2
+
+# files to process and tasks
+# only give relative path within 'labserver_data' folder as found in 'run/userpaths.py'
+
+240729_T-36_Ablation_T3-R/Fly2||002_pre-beh,004_post-beh,005_post-beh||p_AblationPipeline
+240729_T-36_Ablation_T3-L/Fly1||002_pre-beh,003_post-beh,005_post-beh,007_post-beh||p_AblationPipeline
+240726_T-36_Ablation_T3-R/Fly2||003_post-beh,005_post-beh||p_AblationPipeline
+
+
