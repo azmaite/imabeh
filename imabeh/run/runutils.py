@@ -33,12 +33,12 @@ def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
         lines = file.readlines()
         lines = [line.rstrip() for line in lines]
 
-    # get the current user
+    # read the file to get the current user
     for line in lines:
         if line.startswith("CURRENT_USER"):
             current_user = line.split("=")[1].strip()
 
-    # check that the file contains the CURRENT_USER variable
+    # check that the file does contain the CURRENT_USER variable
     try:
         current_user
     except NameError:
