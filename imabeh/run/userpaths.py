@@ -23,7 +23,12 @@ GLOBAL_PATHS = {
     "fictrac_path": "/behData/fictrac",
     "df3d_path": "/behData/df3d",
     "processed_path": "/processed",
-    "figures_path": "/figures"
+    "figures_path": "/figures",
+
+    # location of file with fly_dirs that should be processed
+    "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
+    # location of the current user file
+    "txt_current_user": os.path.join(LOCAL_DIR, "_current_user.txt")
 }
 
 # settins for cameras of each scope
@@ -49,14 +54,6 @@ USER_MA_2p2 = {
 
     # which scope you're using
     "scope": "2p_scope_2",
-
-    # location of file with fly_dirs that should be processed
-    "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
-    # where to store which tasks are currently running
-    "txt_file_running": os.path.join(LOCAL_DIR, "_tasks_running.txt"),
 }
 
-
-# Default user:
-DEFAULT_USER = USER_MA_2p2
 
