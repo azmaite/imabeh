@@ -28,7 +28,10 @@ GLOBAL_PATHS = {
     # location of file with fly_dirs that should be processed
     "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
     # location of the current user file
-    "txt_current_user": os.path.join(LOCAL_DIR, "_current_user.txt")
+    "txt_current_user": os.path.join(LOCAL_DIR, "_current_user.txt"),
+    
+    # name of csv file to keep track of which fly folders have been processed
+    "csv_fly_table": "_fly_processing_status.csv",
 }
 
 # settins for cameras of each scope
@@ -42,18 +45,32 @@ SCOPE_CONFIG = {
         "camera_order": [6, 5, 4, 3, 2, 1, 0],
         "fictrac_cam": 3,
         "opto_cam": 5
-    }
+    },
+    "scape": {
+        "camera_order": [6, 5, 4, 3, 2, 1, 0],   ################################## TODO: check this
+        "fictrac_cam": 3,
+        "opto_cam": 5
+    },
 }
 
 
 # default settings for each user (create a new one per person and scope)
 USER_MA_2p2 = {
-    "initials": "MA",
+    "initials": "MA_2p2",
     "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "AZCORRA_Maite", "Experimental_data", "2P"),
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
 
     # which scope you're using
     "scope": "2p_scope_2",
+}
+
+USER_MA_scape = {
+    "initials": "MA_scape",
+    "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "AZCORRA_Maite", "Experimental_data", "2P"),
+    "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
+
+    # which scope you're using
+    "scope": "scape",
 }
 
 
