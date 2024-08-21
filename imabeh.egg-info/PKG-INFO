@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: imabeh
+Version: 0.0.1
+Home-page: https://github.com/azcorra/imabeh
+Author: Maite Azcorra
+Author-email: maite.azcorrasedano@epfl.ch
+Requires-Python: >=3.7
+Description-Content-Type: text/x-rst
+License-File: LICENSE
