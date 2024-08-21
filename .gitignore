@@ -3,6 +3,7 @@ outputs/
 .workspace*
 tmp/
 testing.ipynb
+logs/
 
 .gittoken
 
