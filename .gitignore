@@ -4,6 +4,7 @@ outputs/
 tmp/
 testing.ipynb
 logs/
+_fly_dirs_to_process.txt
 
 .gittoken
 
