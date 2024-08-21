@@ -6,7 +6,7 @@ import os
 import importlib
 import pandas as pd
 
-from imabeh.run.userpaths import GLOBAL_PATHS
+from imabeh.run.userpaths import GLOBAL_PATHS, LOCAL_DIR
 
 
 def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
@@ -337,6 +337,73 @@ def update_fly_table(fly_table, fly_trial, task_list, status_list):
     
 
 ## FUNCTIONS TO MANAGE THE TASK LOG
+
+def _delete_old_logs():
+    """ Delete logs older than 14 days from the logs folder
+    to avoid having too many old log files in the folder.
+    """
+
+    # get the path for the log folder
+    log_folder = os.path.join(LOCAL_DIR, 'logs')
+
+    # get the list of log files in the folder
+    log_files = os.listdir(log_folder)
+
+    for log_file in log_files:
+        # Get log file creation date from name
+        log_date = pd.to_datetime(log_file[4:19], format='%Y%m%d_%H%M%S')
+        
+        # Delete if older than 14 days
+        if pd.Timestamp.now() - log_date > pd.Timedelta(days=14):
+            os.remove(os.path.join(log_folder, log_file))
+
+
+def create_task_log():
+    """ Create new task log file with the current date and time. 
+    
+    Returns
+    -------
+    task_log_path : str
+        path to the new task log file
+    """
+
+    # delete old logs (to avoid having too many old log files)
+    _delete_old_logs()
+
+    # create a log folder if it doesn't exist
+    task_log_folder = os.path.join(LOCAL_DIR, 'logs')
+    if not os.path.exists(task_log_folder):
+        os.makedirs(task_log_folder)
+
+    # name the task log using current datetime
+    now = pd.Timestamp.now()
+    task_log_name = 'log_' + now.strftime("%Y%m%d_%H%M%S") + '.txt'
+
+    # get the path for the task log
+    task_log_path = os.path.join(task_log_folder, task_log_name)
+
+    # create a new task log file
+    with open(task_log_path, "w") as file:
+        file.write(f"Task log created on {now}\n")
+        file.write('\n')
+
+    return task_log_path
+
+
+def add_line_to_log(task_log_path, line):
+    """ Add a line to the current task log file.
+    
+    Parameters
+    ----------
+    task_log_path : str
+        path to the current task log file
+    line : str
+        line to add to the task log file
+    """
+
+    # add a new line to the task log
+    with open(task_log_path, "a") as file:
+        file.write(line + '\n')
 
 
 
