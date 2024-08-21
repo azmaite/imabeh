@@ -22,7 +22,8 @@ def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
 
     Returns
     -------
-    current_user : str
+    current_user_settings : dict
+        user specific settings from the userpaths.py file
 
     """
     # check that the file exists
