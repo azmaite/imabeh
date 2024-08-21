@@ -1,7 +1,8 @@
 #task_collection
 
 """
-sub-module to define different steps of pre-processing as sub-classes of Task
+sub-module to define different steps of pre-processing as sub-classes of Task.
+List of all available tasks is defined in task_collection at the bottom - REMEMBER TO ADD NEW TASKS THERE!
 """
 import os
 import time
@@ -26,11 +27,6 @@ import time
 # from twoppp.run.runutils import send_email,split_fly_dict_trials
 
 from imabeh.run.runutils import add_line_to_log
-
-# List of all tasks available to run (defined below)
-task_collection = {
-    "test": TestTask,
-}
 
 
 # # List of all tasks available to run (defined below)
@@ -496,3 +492,9 @@ class TestTask(Task):
 #                 _ = add_beh_state_to_twop_df(twop_df, twop_df_out_dir=twop_df)
 #             self.previous_tasks = previous_tasks
 #         return True
+
+
+# List of all tasks available to run (defined above)
+task_collection = {
+    "test": TestTask,
+}
