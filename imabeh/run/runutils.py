@@ -11,6 +11,9 @@ from imabeh.run.userpaths import GLOBAL_PATHS
 def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
     """
     Reads the supplied text file and returns the current user name.
+    It checks that the text file exists, that the format is correct,
+    and that the user exists in the userpaths file.
+
     Format in the txt file:
     CURRENT_USER = USER_XXX
     Must match existing dictionary in 'run/userpaths.py'
@@ -63,6 +66,9 @@ def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
     """
     reads the supplied text file and returns a list of dictionaries
     with information for each fly to process and the tasks to run on it.
+    It checks that the text file exists, that the format is correct,
+    and that the fly directories within it exist.
+
     General requested format of a line in the txt file (see example in file):
     fly_dir||trial1,trial2||task1,task2,!task3,
     ! before a task forces an overwrite.
