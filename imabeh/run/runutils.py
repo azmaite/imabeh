@@ -127,13 +127,34 @@ def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
             raise FileNotFoundError(f"Fly directory {fly_dict['dir']} does not exist. Please check fly list {txt_file}.")
         else:
             # check that the trials exist
-            trials = fly_dict["selected_trials"].split(",")
+            trials = get_trials(fly_dict)
             for trial in trials:
-                trial_path = os.path.join(data_path, fly_dict["dir"], trial)
+                trial_path = os.path.join(data_path, trial)
                 if not os.path.exists(trial_path):
                     raise FileNotFoundError(f"Trial {trial} does not exist in fly directory {fly_dict['dir']}. Please check fly list {txt_file}.")
 
     return fly_dicts
+
+
+def get_trials(fly_dict):
+    """ Function to get a list of trial paths from the fly_dict selected_trials field.
+    
+    Parameters
+    ----------
+    fly_dict : dict
+        dictionary with the fly information (dir, selected_trials)
+        the selected_trials field is a string with the trials separated by commas
+    
+    Returns
+    -------
+    trial_path_list : list
+        list of trial paths
+    """
+
+    trials = fly_dict["selected_trials"].split(",")
+    trial_path_list = [fly_dict["dir"] + "/" + trial for trial in trials]
+
+    return trial_path_list
 
 
 
@@ -408,10 +429,13 @@ def add_line_to_log(task_log_path, line):
 
 
 # def function():
+#     # task_log_path = create_task_log()
 #     # get the fly table (create if it does not exist, and update task list if needed)
 #     fly_table = get_fly_table()
 #     # do stuff
 #     ...................
+#     # log the stuff!
+#     # add_line_to_log(task_log_path, "Stuff done (or not)")
 #     # update the table status for the given fly trial
 #     update_fly_table(fly_table, fly_trial, task_list, status_list)
 #     # save the table
