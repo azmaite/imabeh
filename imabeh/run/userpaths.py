@@ -3,8 +3,8 @@ sub-module to define paths and user settings for running pre-processing with.
 
 to adapt the parameters for your use:
 1. create a dictionary for your user and define the paths and parameters accordingly
-2. set CURRENT_USER at the top of the "_fly_dirs_to_process.txt" file equal to the dictionary you just created
-3. check that the paths in the dictionaries are correct for your workstation
+2. check that the paths in the dictionaries are correct for your workstation
+3. set CURRENT_USER at the top of the "_fly_dirs_to_process.txt" file equal to the dictionary you just created
 
 also see README.md in the imabeh/run folder for run instructions
 """
@@ -17,6 +17,13 @@ GLOBAL_PATHS = {
     "labserver_files": "/mnt/upramdya_files",
     "labserver_data": "/mnt/upramdya_data",
 
+    # location of the current user file - this cannot be changed user by user!
+    "txt_current_user": os.path.join(LOCAL_DIR, "_current_user.txt"),
+    # location of file with fly_dirs that should be processed - this cannot be changed user by user!
+    "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
+}
+
+DEFAULT_PATHS = {
     # paths to different folders within each trial (to append to each trial path)
     "2p_path": "/2p",
     "septacam_path": "/behData/images",
@@ -24,11 +31,6 @@ GLOBAL_PATHS = {
     "df3d_path": "/behData/df3d",
     "processed_path": "/processed",
     "figures_path": "/figures",
-
-    # location of file with fly_dirs that should be processed
-    "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
-    # location of the current user file
-    "txt_current_user": os.path.join(LOCAL_DIR, "_current_user.txt"),
     
     # name of csv file to keep track of which fly folders have been processed
     "csv_fly_table": "_fly_processing_status.csv",
@@ -36,12 +38,12 @@ GLOBAL_PATHS = {
 
 # settins for cameras of each scope
 SCOPE_CONFIG = {
-    "2p_scope_1": {
+    "2p_1": {
         "camera_order": [0, 1, 2, 3, 4, 5, 6], # order of cameras for df3d
         "fictrac_cam": 4, # camera used for fictrac
         "opto_cam": 2     # camera with clearest laser stimulation spot
     },
-    "2p_scope_2": {
+    "2p_2": {
         "camera_order": [6, 5, 4, 3, 2, 1, 0],
         "fictrac_cam": 3,
         "opto_cam": 5
@@ -55,21 +57,34 @@ SCOPE_CONFIG = {
 
 
 # default settings for each user (create a new one per person and scope)
+# the default paths/settings for all users are defined in DEFAULT_PATHS and SCOPE_CONFIG
+# to use any non-default paths or settings, add them to your user dictionary:
+# they will have priority over the defaults
+
+USER_EXAMPLE_2p2 = {
+    "initials": "EX_2p1",
+    "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "EXAMPLE_User", "Experimental_data", "2P"),
+    "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "EX"),
+
+    # which scope you're using
+    "scope": "2p_2",
+
+    # non-default paths or settings
+    "csv_fly_table": "_example_project_status.csv",
+    "opto_cam": 2,
+}
+
 USER_MA_2p2 = {
     "initials": "MA_2p2",
     "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "AZCORRA_Maite", "Experimental_data", "2P"),
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
-
-    # which scope you're using
-    "scope": "2p_scope_2",
+    "scope": "2p_2",
 }
 
 USER_MA_scape = {
     "initials": "MA_scape",
     "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "AZCORRA_Maite", "Experimental_data", "2P"),
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
-
-    # which scope you're using
     "scope": "scape",
 }
 

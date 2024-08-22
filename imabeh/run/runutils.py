@@ -6,14 +6,17 @@ import os
 import importlib
 import pandas as pd
 
-from imabeh.run.userpaths import GLOBAL_PATHS, LOCAL_DIR
+from imabeh.run.userpaths import GLOBAL_PATHS, LOCAL_DIR, DEFAULT_PATHS, SCOPE_CONFIG
 
 
 def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
     """
-    Reads the supplied text file and returns the current user name.
+    Reads the supplied text file and returns the current user name,
+    as well as the user specific paths/settings from the userpaths.py file.
     It checks that the text file exists, that the format is correct,
     and that the user exists in the userpaths file.
+    It then combines the user specific settings with the default settings,
+    prioritizing the user specific settings.
 
     Format in the txt file:
     CURRENT_USER = USER_XXX
@@ -26,8 +29,8 @@ def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
 
     Returns
     -------
-    current_user_settings : dict
-        user specific settings from the userpaths.py file
+    paths_settings : dict
+        default + scope + user specific settings from the userpaths.py file
 
     """
     # check that the file exists
@@ -58,17 +61,23 @@ def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
 
     # get the current user specific settings
     userpaths_module = importlib.import_module('imabeh.run.userpaths')
-    current_user_settings = getattr(userpaths_module, current_user)
+    user_paths_settings = getattr(userpaths_module, current_user)
 
-    return current_user_settings
+    # Combine the default paths with the user scope settings
+    paths_settings = SCOPE_CONFIG[user_paths_settings["scope"]]
+    paths_settings.update(DEFAULT_PATHS)
+    # combine the prior settings with the user specific settings (prioritizing the user settings)
+    paths_settings.update(user_paths_settings)
+
+    return paths_settings
 
 
-def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
+def _read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
     """
     reads the supplied text file and returns a list of dictionaries
     with information for each fly to process and the tasks to run on it.
     It checks that the text file exists, that the format is correct,
-    and that the fly directories within it exist.
+    that the fly directories within it exist, and that the tasks are valid.
 
     General requested format of a line in the txt file (see example in file):
     fly_dir||trial1,trial2||task1,task2,!task3,
@@ -86,12 +95,11 @@ def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
     fly_dict : dict
         fly dict with the following fields:
         - "dir": the base directory of the fly
-        - "selected_trials": a string describing which trials to run on,
-                             e.g. "001,002" or "all_trials"
+        - "selected_trials": a comma separated string containing the names of the trials to analyze
         - "tasks": a comma separated string containing the names of the tasks todo
 
     """
-    # check that the file exists
+    # check that the txt file exists
     if not os.path.exists(txt_file):
         raise FileNotFoundError(f"File {txt_file} does not exist. Please create it with the flies to process.")
     
@@ -101,7 +109,7 @@ def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
         lines = [line.rstrip() for line in lines]
     fly_dicts = []
 
-    # get the flies to process
+    # get the flies, trials, and tasks to process
     for line in lines:
         if line.startswith("#") or line == "":
             continue
@@ -117,7 +125,7 @@ def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
         }
         fly_dicts.append(fly)
 
-    # Check that the fly dirs exist
+    # Check that the fly and trial dirs exist
     current_user_settings = read_current_user()
     data_path = current_user_settings["labserver_data"]
 
@@ -132,6 +140,17 @@ def read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
                 trial_path = os.path.join(data_path, trial)
                 if not os.path.exists(trial_path):
                     raise FileNotFoundError(f"Trial {trial} does not exist in fly directory {fly_dict['dir']}. Please check fly list {txt_file}.")
+
+    # Check that the tasks are valid
+    from imabeh.run.tasks import task_collection
+    task_collection = list(task_collection.keys())
+    for fly_dict in fly_dicts:
+        tasks = fly_dict["tasks"].split(",")
+        for task in tasks:
+            #remove the ! if present
+            task = task.replace("!", "")
+            if task not in task_collection:
+                raise ValueError(f"Task {task} is not a valid task. Please check fly list {txt_file}.")
 
     return fly_dicts
 
@@ -155,6 +174,10 @@ def get_trials(fly_dict):
     trial_path_list = [fly_dict["dir"] + "/" + trial for trial in trials]
 
     return trial_path_list
+
+def get_todo_list():
+    fly_list = _read_fly_dirs()
+    
 
 
 
@@ -225,8 +248,8 @@ def get_fly_table():
         fly processing status table
     """
     # get the path for the fly processing table
-    data_path = read_current_user()["labserver_data"]
-    fly_table_path = os.path.join(data_path, GLOBAL_PATHS["csv_fly_table"])
+    data_path,file_name = read_current_user()["labserver_data","csv_fly_table"]
+    fly_table_path = os.path.join(data_path, file_name)
 
     # check that the fly processing table file exists, and create one if not
     if not os.path.exists(fly_table_path):
@@ -249,8 +272,8 @@ def save_fly_table(fly_table):
         table with the current fly processing status
     """
     # get the path for the fly processing table
-    data_path = read_current_user()["labserver_data"]
-    fly_table_path = os.path.join(data_path, GLOBAL_PATHS["csv_fly_table"])
+    data_path,file_name = read_current_user()["labserver_data","csv_fly_table"]
+    fly_table_path = os.path.join(data_path, file_name)
 
     # save the dataframe to a csv file
     fly_table.to_csv(fly_table_path, index=False)
