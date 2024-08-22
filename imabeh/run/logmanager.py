@@ -1,7 +1,12 @@
 """
 Log manager module housing the LogManager class.
-Contains functions to:
-- Delete old log files
+Manages the logs to keep track of processing status, timing and errors.
+
+Logs will be saved within the imabeh/run/logs folder (default) as txt files,
+named usign the time of creating as 'log_date_time.txt'.
+
+The LogManager class contains functions to:
+- Delete old log files (> 14 days old) - private function
 - Create a new log file
 - Add a line to the current log file
 """
@@ -89,9 +94,6 @@ class LogManager():
         line : str
             line to add to the task log file
         """
-        # check if there is a current task log open. If not, create a new task log
-        if self.lof_file == '':
-            self.create_task_log()
 
         # add a new line to the task log
         log_file_path = os.path.join(self.log_folder, self.log_file)
