@@ -5,10 +5,10 @@ Manages the logs to keep track of processing status, timing and errors.
 Logs will be saved within the imabeh/run/logs folder (default) as txt files,
 named usign the time of creating as 'log_date_time.txt'.
 
-The LogManager class contains functions to:
-- Delete old log files (> 14 days old) - private function
-- Create a new log file
-- Add a line to the current log file
+The LogManager class contains the followingfunctions:
+    _delete_old_logs - Delete old log files (> 14 days old)
+    create_task_log - Create a new log file
+    add_line_to_log - Add a line to the current log file
 """
 
 import os

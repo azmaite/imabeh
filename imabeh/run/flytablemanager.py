@@ -4,22 +4,24 @@ Manages the table of processing table for each fly trial.
 
 The fly processing table is a pandas dataframe saved as a csv that contains:
 - the list of fly trials that have been analyzed (directories made of fly_dir and path)
-- which tasks have been processed for each trial and their status (0 = not run, 1 - ran successfuly, 2 = ran with errors).
+- which tasks have been processed for each trial and their status (0 = not run, 1 - ran successfuly, 
+    2 = ran with errors).
 - which user analyzed the trial
 - which pipeline(s) was run on the trial if any
 - comments (if any)
 
-The FlyTableManager class contains functions to:
-- Check the status of a given fly trial and task in the fly processing table
-- Update the status of a given fly trial and task in the fly processing table, adding them if necessary
+The FlyTableManager class contains the following functions:
+    check_trial_task_status - Check the status of a given fly trial and task in the fly processing table
+    update_trial_task_status - Update the status of a given fly trial and task in the fly processing table, 
+        adding them if necessary
 
-Contains (private) functions to:
-- Create a new fly processing table
-- Save the fly processing table as a csv file
-- Get the fly processing table from a path
-- Find a fly trial in the fly processing table
-- Add a new fly trial to the fly processing table
-- Add a new task to the fly processing table
+Contains (private) functions:
+    _create_fly_table - Create a new fly processing table
+    _save_fly_table - Save the fly processing table as a csv file
+    _get_fly_table - Get the fly processing table from a path
+    _add_fly_to_fly_table - Add a new fly trial to the fly processing table
+    _find_fly_in_fly_table - Find a fly trial in the fly processing table
+    _add_new_task - Add a new task to the fly processing table
 
 Will optionally log the creation of a new table and the addition of new tasks using LogManager.
 """
