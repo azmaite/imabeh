@@ -1,17 +1,27 @@
 """
 Status table manager module housing the FlyTableManager class.
+Manages the table of processing table for each fly trial.
 
-Contains functions to:
+The fly processing table is a pandas dataframe saved as a csv that contains:
+- the list of fly trials that have been analyzed (directories made of fly_dir and path)
+- which tasks have been processed for each trial and their status (0 = not run, 1 - ran successfuly, 2 = ran with errors).
+- which user analyzed the trial
+- which pipeline(s) was run on the trial if any
+- comments (if any)
+
+The FlyTableManager class contains functions to:
+- Check the status of a given fly trial and task in the fly processing table
+- Update the status of a given fly trial and task in the fly processing table, adding them if necessary
+
+Contains (private) functions to:
 - Create a new fly processing table
 - Save the fly processing table as a csv file
 - Get the fly processing table from a path
-- Check that all available tasks are in the table (and add them if they are not)
 - Find a fly trial in the fly processing table
 - Add a new fly trial to the fly processing table
-- Check the status of a fly trial and task in the fly processing table
-- Update the status of a fly trial and task in the fly processing table
+- Add a new task to the fly processing table
 
-Will log the creation of a new table and the addition of new tasks to the table using LogManager.
+Will optionally log the creation of a new table and the addition of new tasks using LogManager.
 """
 
 import os
@@ -27,7 +37,7 @@ user_config = read_current_user()
 
 class FlyTableManager():
     """
-    class to manage the table of task statuses for each fly processing.
+    class to manage the fly processing table.
     """
     def __init__(self, table_folder: str = '', table_file: str = '') -> None:
         """
@@ -82,11 +92,8 @@ class FlyTableManager():
         self.fly_table : pandas.DataFrame
         """
 
-        # get the list of possible tasks 
-        from imabeh.run.tasks_2 import task_collection
-
         # make a pandas dataframe with the header
-        header = ["fly_dir", "trial", "pipelines"] + list(task_collection.keys()) + ["user", "comments"]
+        header = ["fly_dir", "trial", "pipelines", "user", "comments"]
         self.fly_table = pd.DataFrame(columns=header)
 
         # save the dataframe to a csv file
@@ -112,39 +119,9 @@ class FlyTableManager():
         self.table.to_csv(table_path, index=False)
 
 
-    def _check_new_tasks(self, log: LogManager = None):
-        """ Check that all tasks in the task.collection are in the fly processing table
-        and add them if they are not.
-        If a log is provided, log the addition of new tasks if necessary.
-        Parameters
-        ----------
-        self.table : pandas.DataFrame
-        log : LogManager, optional
-        """
-
-        # get the list of possible tasks 
-        from imabeh.run.tasks_2 import task_collection
-        task_collection = list(task_collection.keys())
-
-        # check that all tasks are in the table and add them if they are not
-        new_columns = False
-        for task in task_collection:
-            if task not in self.table.columns:
-                self.table[task] = 0
-                new_columns = True
-        
-        # if new columns were added, save the table
-        if new_columns:
-            self.save_fly_table()
-            # if log is provided, log the addition of new tasks
-            if log is not None:
-                log.add_line("STATUS_TABLE: Newly availabe tasks added to the fly processing table")
-
-
     def _get_fly_table(self):
         """ Get the fly status processing table from the path.
         Check that the table exists, and create one if it does not.
-        Check that all the possible tasks are in the table, and add them if they are not.
 
         Parameters
         ----------
@@ -163,14 +140,54 @@ class FlyTableManager():
         if not os.path.exists(table_path):
             self._create_fly_table()
 
-        # otherwise read the table from the file and check that all tasks are in the table
+        # otherwise read the table from the file
         else:
             self.table = pd.read_csv(table_path)
-            self._check_new_tasks(self.table)    
+
+
+def _add_fly_to_fly_table(self, single_trial: dict):
+        """ Add a new fly trials to the fly processing status table. 
+
+        Parameters
+        ----------
+        self.table : pandas.DataFrame
+        single_trial : dict
+            dictionary with a single fly TRIAL information (dir, trial)
+
+        Returns
+        ----------
+        fly_index : int
+            row index of new fly in the processing table. 
+        """
+
+        # create the fly row and fill the non-task columns
+        new_row = {
+            "fly_dir": single_trial["dir"],
+            "trial": single_trial['trial'],
+            "pipelines": ' ',
+            "user": user_config["initials"],
+            "comments": ' '
+        }
+        # Add a zero for each column in the table which isn't already in new_row (tasks)
+        for column in self.table.columns:
+            if column not in new_row:
+                new_row[column] = 0
+
+        # Append the new row to the fly table
+        self.table = self.table.append(new_row, ignore_index=True)
+
+        # save the table
+        self._save_fly_table()
+    
+        # get new index to return
+        fly_index = self._find_fly_in_fly_table(self, single_trial)
+        return fly_index
 
 
     def _find_fly_in_fly_table(self, single_trial: dict):
         """ Find a fly in the processing status table. 
+        If the fly doesn't exist, it add it to the table.
+        First checks that input format is correct
 
         Parameters
         ----------
@@ -182,70 +199,52 @@ class FlyTableManager():
         -------
         fly_index: int
             row index of fly in the processing table. 
-            returns -1 if the fly is not in the table
         """
 
-        # check that the input fly_dict format is correct (only one trial)
+        # check that the input single_trial format is correct (only one trial)
         if not all([key in single_trial for key in ["dir", "trial"]]):
             raise ValueError("Fly trial dictionary must have 'dir' and 'trial' keys.")
         if "," in single_trial["trial"]:
             raise ValueError("Fly trial dictionary must have only one trial.")
-        
+
         # find the index of the fly trial in the processing table
         fly_index = self.table[
             (self.table["fly_dir"] == single_trial["dir"]) & 
             (self.table["trial"] == single_trial["trial"])
         ].index
         
+        # if the fly is not found, add it. This will return the new index.
         if len(fly_index) == 0:
-            return -1
+            fly_index = self._add_fly_to_fly_table(self, single_trial)
         else:
-            return fly_index[0]
+            fly_index = fly_index[0]
+        
+        return fly_index
+    
 
-
-    def _add_fly_to_fly_table(self, single_trial: dict):
-        """ Add a new fly trials to the fly processing status table. 
+    def _add_new_task(self, task: str, log: LogManager = None):
+        """ Add a new task to the fly processing table
+        If a log is provided, log the addition of the new task.
 
         Parameters
         ----------
         self.table : pandas.DataFrame
-        single_trial : dict
-            dictionary with a single fly TRIAL information (dir, trial)
+        task : str
+            name of task to add to table
+        log : LogManager, optional
         """
 
-        # Check whether the fly trial is already in the table
-        # this will check the format of the input dictionary
-        fly_index = self._find_fly_in_fly_table(self, single_trial)
-
-        # if the fly is not in the table, add it
-        if fly_index == -1:
-            new_row = {
-                "fly_dir": single_trial["dir"],
-                "trial": single_trial['trial'],
-                "pipelines": ' ',
-                "user": user_config["initials"],
-                "comments": ' '
-            }
-            # Add a zero for each task in the table that isn't already in new_row (tasks)
-            for column in self.table.columns:
-                if column not in new_row:
-                    new_row[column] = 0
-
-            # Append the new row to the fly table
-            self.table = self.table.append(new_row, ignore_index=True)
+        # add new task as empty column
+        self.table[task] = 0
         
-            # get new index
-            fly_index = self._find_fly_in_fly_table(self, single_trial)
-        
-            # save the table
-            self._save_fly_table()
+        # if log is provided, log the addition of new task
+        if log is not None:
+            log.add_line(f"STATUS_TABLE: New task added to the fly processing table : {task}")
 
-        # return the fly index
-        return fly_index
-    
 
     def check_trial_task_status(self, single_trial: dict, task: str):
         """ Check the status of a fly trial and task in the fly processing table. 
+        If the task doesn't exist, return 0 (not done)
 
         Parameters
         ----------
@@ -264,14 +263,19 @@ class FlyTableManager():
         # find the fly index in the table. Checks format already
         fly_index = self._find_fly_in_fly_table(single_trial)
 
-        # get the status of the task for the fly trial
-        status = self.table.loc[fly_index, task]
+        # check if the task exists in the table, if not return 0 (not done)
+        if task not in self.table.columns:
+            status = 0
+        else:
+            # get the status of the task for the fly trial
+            status = self.table.loc[fly_index, task]
 
         return status
 
 
-    def update_trial_task_status(self, single_trial: dict, task: str, status: int):
+    def update_trial_task_status(self, single_trial: dict, task: str, status: int, log: LogManager = None):
         """ Update the status of a fly trial and task in the fly processing table.
+        If the fly or task don't yet exist in the table, add them.
         Saves the table.
 
         Parameters
@@ -283,10 +287,16 @@ class FlyTableManager():
             task name
         status : int
             status of the task for the fly trial (0 = not done, 1 = done, 2 = error)
+        log : LogManager, optional
         """
 
-        # find the fly index in the table. Checks format already
+        # find the fly index in the table. 
+        # Checks format already and adds fly if not in table
         fly_index = self._find_fly_in_fly_table(single_trial)
+
+        # check if the task exists in the table, and if not, add it
+        if task not in self.table.columns:
+            self._add_new_task(self, task, log: LogManager = None)
 
         # update the status of the task for the fly trial
         self.table.loc[fly_index, task] = status
