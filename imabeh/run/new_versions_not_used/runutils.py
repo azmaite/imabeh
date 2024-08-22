@@ -145,7 +145,7 @@ def _read_fly_dirs(txt_file = current_user_settings["txt_file_to_process"]):
                     raise FileNotFoundError(f"Trial {trial} does not exist in fly directory {fly_dict['dir']}. Please check fly list {txt_file}.")
 
     # Check that the tasks are valid
-    from imabeh.run.tasks import task_collection
+    from imabeh.imabeh.run.new_versions_not_used.tasks import task_collection
     task_collection = list(task_collection.keys())
     for fly_dict in fly_dicts:
         tasks = fly_dict["tasks"].split(",")
@@ -184,7 +184,7 @@ def get_todo_list():
 
 
 
-## FUNCTIONS TO MANAGE THE FLY PROCESSING TABLE
+## FUNCTIONS TO MANAGE THE FLY PROCESSING TABLE - TODO make class
 
 def _initialize_fly_table():
     """ Create an empty fly processing table file. 
@@ -194,7 +194,7 @@ def _initialize_fly_table():
         empty fly processing status table"""
 
     # get the list of possible tasks 
-    from imabeh.run.tasks import task_collection
+    from imabeh.imabeh.run.new_versions_not_used.tasks import task_collection
 
     # make a pandas dataframe with the header
     header = ["fly_dir", "trial", "pipelines"] + list(task_collection.keys()) + ["user", "comments"]
@@ -221,7 +221,7 @@ def _check_new_tasks(fly_table):
     """
 
     # get the list of possible tasks 
-    from imabeh.run.tasks import task_collection
+    from imabeh.imabeh.run.new_versions_not_used.tasks import task_collection
     task_collection = list(task_collection.keys())
 
     # check that all tasks are in the table and add them if they are not
@@ -383,7 +383,7 @@ def update_fly_table(fly_table, fly_trial, task_list, status_list):
     return fly_table
     
 
-## FUNCTIONS TO MANAGE THE TASK LOG
+## FUNCTIONS TO MANAGE THE TASK LOG - TODO make class
 
 def _delete_old_logs():
     """ Delete logs older than 14 days from the logs folder

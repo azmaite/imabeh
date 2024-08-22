@@ -5,7 +5,7 @@
 import unittest
 import os
 
-from imabeh.run.runutils import read_current_user, read_fly_dirs
+from imabeh.imabeh.run.new_versions_not_used.runutils import read_current_user, read_fly_dirs
 
 
 class TestGetCurrentUser(unittest.TestCase):
