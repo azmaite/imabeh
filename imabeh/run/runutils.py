@@ -61,18 +61,22 @@ def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
 
     # get the current user specific settings
     userpaths_module = importlib.import_module('imabeh.run.userpaths')
-    user_paths_settings = getattr(userpaths_module, current_user)
+    user_set_settings = getattr(userpaths_module, current_user)
 
     # Combine the default paths with the user scope settings
-    paths_settings = SCOPE_CONFIG[user_paths_settings["scope"]]
-    paths_settings.update(DEFAULT_PATHS)
+    current_user_settings = SCOPE_CONFIG[user_set_settings["scope"]]
+    current_user_settings.update(DEFAULT_PATHS)
     # combine the prior settings with the user specific settings (prioritizing the user settings)
-    paths_settings.update(user_paths_settings)
+    current_user_settings.update(user_set_settings)
 
-    return paths_settings
+    return current_user_settings
 
 
-def _read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
+## get user paths to use in other functions!
+current_user_settings = read_current_user()
+
+
+def _read_fly_dirs(txt_file = current_user_settings["txt_file_to_process"]):
     """
     reads the supplied text file and returns a list of dictionaries
     with information for each fly to process and the tasks to run on it.
@@ -88,7 +92,7 @@ def _read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
     Parameters
     ----------
     txt_file : str, optional
-        location of the text file, by default set in GLOBAL_PATHS["txt_file_to_process"]
+        location of the text file, by default set in DEFAULT_PATHS["txt_file_to_process"]
 
     Returns
     -------
@@ -126,7 +130,6 @@ def _read_fly_dirs(txt_file = GLOBAL_PATHS["txt_file_to_process"]):
         fly_dicts.append(fly)
 
     # Check that the fly and trial dirs exist
-    current_user_settings = read_current_user()
     data_path = current_user_settings["labserver_data"]
 
     for fly_dict in fly_dicts:
@@ -248,7 +251,7 @@ def get_fly_table():
         fly processing status table
     """
     # get the path for the fly processing table
-    data_path,file_name = read_current_user()["labserver_data","csv_fly_table"]
+    data_path,file_name = current_user_settings["labserver_data","csv_fly_table"]
     fly_table_path = os.path.join(data_path, file_name)
 
     # check that the fly processing table file exists, and create one if not
@@ -272,7 +275,7 @@ def save_fly_table(fly_table):
         table with the current fly processing status
     """
     # get the path for the fly processing table
-    data_path,file_name = read_current_user()["labserver_data","csv_fly_table"]
+    data_path,file_name = current_user_settings["labserver_data","csv_fly_table"]
     fly_table_path = os.path.join(data_path, file_name)
 
     # save the dataframe to a csv file
@@ -337,7 +340,7 @@ def _add_fly_to_fly_table(fly_table, single_trial):
             "fly_dir": single_trial["dir"],
             "trial": single_trial['trial'],
             "pipelines": ' ',
-            "user": read_current_user()["initials"],
+            "user": current_user_settings["initials"],
             "comments": ' '
         }
         # Add a zero for each task in the table that isn't already in new_row (tasks)

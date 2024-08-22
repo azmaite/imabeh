@@ -19,8 +19,6 @@ GLOBAL_PATHS = {
 
     # location of the current user file - this cannot be changed user by user!
     "txt_current_user": os.path.join(LOCAL_DIR, "_current_user.txt"),
-    # location of file with fly_dirs that should be processed - this cannot be changed user by user!
-    "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
 }
 
 DEFAULT_PATHS = {
@@ -34,6 +32,9 @@ DEFAULT_PATHS = {
     
     # name of csv file to keep track of which fly folders have been processed
     "csv_fly_table": "_fly_processing_status.csv",
+
+    # location of file with fly_dirs that should be processed
+    "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
 }
 
 # settins for cameras of each scope
