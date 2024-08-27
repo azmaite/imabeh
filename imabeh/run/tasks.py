@@ -27,7 +27,7 @@ import time
 # from twoppp.run.runutils import send_email,split_fly_dict_trials
 
 
-from imabeh.imabeh.run.new_versions_not_used.runutils import add_line_to_log
+from imabeh.run.logmanager import LogManager
 
 
 class Task:
@@ -40,7 +40,7 @@ class Task:
         """
         self.name = ""
         self.params = None
-        self.previous_tasks = []
+        self.prerequisites = []
 
     
 
@@ -60,13 +60,12 @@ class TestTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "test"
-        self.previous_tasks = []
+        self.prerequisites = []
 
-    def run(self, trial_path, log_path):
-
+    def run(self, trial_path, log : LogManager) -> bool:
         # log the start of the task
         line = f"{time.ctime(time.time())}: starting {self.name} task for fly {trial_path}"
-        add_line_to_log(log_path, line)
+        log.add_line_to_log(line)
 
         try:
             # RUN TASK!!!
@@ -79,10 +78,43 @@ class TestTask(Task):
             success = False
 
         return success
+    
+
+class TestTask2(Task):
+    """ Useless task for testing purposes.
+    
+    Returns
+    -------
+    success : bool
+        True if the task ran successfully, False otherwise.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "test2"
+        self.prerequisites = ['test']
+
+    def run(self, trial_path, log : LogManager) -> bool:
+        # log the start of the task
+        line = f"{time.ctime(time.time())}: starting {self.name} task for fly {trial_path}"
+        log.add_line_to_log(line)
+
+        try:
+            # RUN TASK!!!
+            print("Running test task 2")
+            time.sleep(5)
+            print("Test task 2 done")
+
+            success = True
+        except:
+            success = False
+
+        return success
 
 
 
 ## List of all tasks available to run (defined above)
 task_collection = {
     "test": TestTask,
+    "test2": TestTask2
 }
