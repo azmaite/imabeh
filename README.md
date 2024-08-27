@@ -14,10 +14,12 @@ Outline of running process:
 2. initalize the TaskManager, which:
     - sets the base properties
     - gets the list of trials/tasks to process from the txt file, as trial_dicts :      TaskManager._read_fly_dirs()
-    - adds each trial+task (a todo) to the todo_list, and whether to overwrite (!) :    TaskManager._add_todos_from_trial()
-    - checks if any of the todos have already been done :                               FlyTableManager.check_trial_task_status()
-    - removes any todos that have been done and should not be overwritten (+log) :      ......
-    - optionally reorders trial+tasks :                                                 ......
-    - checks the pre-requisites for each task and sets statuses acordingly :            ......         
-    - concludes with sorted to-do list!
+    - gets the todo_table, icnluding all tasks that must be run :                       TaskManager._create_todo_table()
+      . adds each trial+task (a todo) to the todo_list, and whether to overwrite (!) :  TaskManager._add_todos_from_trial()
+      . checks if any of the todos have already been completed using the FlyTable :     FlyTableManager.check_trial_task_status()
+      . removes any todos that have been done and should not be overwritten (+log) :    TaskManager._remove_todo()
+      . checks the pre-requisites for each task and sets statuses acordingly :          TaskManager._check_prerequisites()       
+      . concludes with sorted to-do list!
+3. run the TaskManager, which: 
+    - 
 

@@ -31,9 +31,9 @@ class TaskManager():
         task_collection: Dict[str, Task] = task_collection
     ) -> None:
         """
-        Most important component is a list of tasks todo that is managed: self.todo_dicts
+        Most important component is a table of tasks todo that is managed: self.todo_table
         A "todo" ITEM IS DEFINED AS A SINGLE TASK TO BE RUN ON A SINGLE TRIAL
-        Each todo item will have the following fields:
+        Each todo item (row in the table) will have the following fields:
             - index: the index of the todo in the order of tasks to run 
             - dir: the base directory of the fly, where the data is stored
             - trial: the fly trial to analyze
@@ -62,7 +62,7 @@ class TaskManager():
         ###########################################################
         self.clean_exit = False
 
-        # get the fly_table
+        # get the fly_table (to check tasks that have previously been run)
         self.fly_table = FlyTableManager()
 
         # trials_to_process: list of dicts with info for each fly trial from the txt file
@@ -91,6 +91,7 @@ class TaskManager():
         """
         reads the supplied text file and returns a list of dictionaries with information for each fly trial to process.
         USED ONLY ONCE AT START
+
         General requested format of a line in the txt file: fly_dir||trial1,trial2||task1,task2,!task3
         ! before a task forces an overwrite.
         example (see _fly_dirs_to_process_example.txt for more):
@@ -139,9 +140,11 @@ class TaskManager():
     def _add_todos_from_trial(self, trial_dict : dict):
         """
         function to append new todos as rows to self.todo_table from a trial_dict
-        will check if task needs to be overwritten (! at start)
-        add an index to indicate the order in which the tasks must be run - 
-        default order is as provided in the text file
+        USED ONLY ONCE AT START
+
+        will check if task needs to be overwritten (! at start of task name)
+        adds an index to indicate the order in which the tasks must be run - 
+        default order is as provided in the text file (could add a function to reorder, if needed at some point)
 
         Parameters
         ----------
@@ -150,6 +153,9 @@ class TaskManager():
             - "fly_dir": the base directory of the fly
             - "trials": which trials to run on
             - "tasks": a comma separated string containing the names of the tasks to run
+        Generates
+        -------
+            new rows in self.todo_table, one for each task in the trial_dict
         """
 
         # split tasks
@@ -184,41 +190,27 @@ class TaskManager():
         self.todo_table = self.todo_table.sort_index()
 
 
-    def _remove_todo(self, todo_dict : dict, log: LogManager):
-        """
-        function to remove a todo row from the self.todo_table
-
-        Parameters
-        ----------
-        todo_dict: dict
-            todo dict with the following fields:
-            - "fly_dir": the base directory of the fly
-            - "trial": which trial to run on
-            - "task": the name of the task to run
-        """
-
-       # find row that matches todo_dict
-        row = self.todo_table.loc[
-            (self.todo_table["fly_dir"] == todo_dict["fly_dir"]) &  
-            (self.todo_table["trial"] == todo_dict["trial"]) & 
-            (self.todo_table["tasks"] == todo_dict["tasks"])
-        ]
-
-        # remove row
-        self.todo_table = self.todo_table.drop(row.index)
-
-        # log removal
-        LogManager.add_line_to_log(log, f"Removed task {todo_dict['task']} for fly {todo_dict['fly_dir']} trial {todo_dict['trial']} from todo_table.")
-
-
     def _create_todo_table(self, log: LogManager):
         """
         create the todo_table from the list of self.trials_to_process
+        USED ONLY ONCE AT START
+
         checks if tasks have been completed previously. If so, checks if they need to be overwritten.
-        if already completed and overwrite = False, log and remove from list of to_run
-        if already completed and overwrite = True, change status in fly_table to 2 to allow re-running
-        but also for tasks to depende on it to wait until it is re-run
+            if already completed and overwrite = False, log and remove from list of to_run
+            if already completed and overwrite = True, change status in fly_table to 2 
+                to allow re-running and for tasks to depende on it to wait until it is re-run
         finally checks the pre-requisites for each task and set statuses acordingly
+
+        Parameters
+        ----------
+        log: LogManager to log the creation of the todo_table
+
+        Generates
+        -------
+        self.todo_table with the following columns, containing the todos from self.trials_to_process:
+            - "fly_dir": the base directory of the fly
+            - "trial": which trial to run on
+            - "task": the name of the task to run
         """
         # create empty table
         header = ["fly_dir", "trial", "task", "overwrite", "status"]
@@ -246,10 +238,44 @@ class TaskManager():
             self._check_prerequisites(todo, todo_index)
 
 
+    def _remove_todo(self, todo_dict : dict, log: LogManager):
+        """
+        function to remove a todo row from the self.todo_table
+        USED AT START IF TASK HAS BEEN COMPLETED PREVIOUSLY AND OVERWRITE = FALSE
+        ALSO USED AFTER A TASK HAS BEEN COMPLETED
+
+        Parameters
+        ----------
+        todo_dict: dict
+            todo dict with the following fields:
+            - "fly_dir": the base directory of the fly
+            - "trial": which trial to run on
+            - "task": the name of the task to run
+            log: LogManager to log the removal
+        Generates
+        -------
+            removes the row from self.todo_table
+        """
+
+       # find row that matches todo_dict
+        row = self.todo_table.loc[
+            (self.todo_table["fly_dir"] == todo_dict["fly_dir"]) &  
+            (self.todo_table["trial"] == todo_dict["trial"]) & 
+            (self.todo_table["tasks"] == todo_dict["tasks"])
+        ]
+
+        # remove row
+        self.todo_table = self.todo_table.drop(row.index)
+
+        # log removal
+        LogManager.add_line_to_log(log, f"Removed task {todo_dict['task']} for fly {todo_dict['fly_dir']} trial {todo_dict['trial']} from todo_table.")
+
+
     def _check_prerequisites(self, todo, todo_index) -> bool:
         """
         check if all the prerequisites for a task are met and set statuses acordingly
         "ready" if all pre-requisites are met, "waiting" otherwise
+        WILL BE USED AT START AND BEFORE THE NEXT TASK IS CHOSEN TO RUN
 
         Parameters
         ----------
@@ -259,6 +285,10 @@ class TaskManager():
             - "trial": which trial to run on
             - "task": the name of the task to run
         todo_index : index of the todo row in the todo_table
+
+        Generates
+        -------
+            changes the status of the todo in the todo_table based on prerequisite status
         """
 
         # convert todo to dict
