@@ -49,7 +49,7 @@ class LogManager():
             os.makedirs(self.log_folder)
 
         # create a new log upon initializing
-        self.create_task_log(self)
+        self.create_task_log()
 
 
     def _delete_old_logs(self):

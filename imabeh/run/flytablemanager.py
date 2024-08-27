@@ -29,12 +29,11 @@ Will optionally log the creation of a new table and the addition of new tasks us
 import os
 import pandas as pd
 
-from imabeh.run.userpaths import LOCAL_DIR, read_current_user
+from imabeh.run.userpaths import LOCAL_DIR, get_current_user_config
 from imabeh.run.logmanager import LogManager
 
-
 # get the current user configuration (paths and settings)
-user_config = read_current_user()
+user_config = get_current_user_config()
 
 
 class FlyTableManager():
@@ -61,7 +60,7 @@ class FlyTableManager():
         # PROPERTIES
         self.table_folder = table_folder
         self.table_file = table_file
-        self.table = None
+        self.fly_table = None
 
         # if the table folder and file are not provided, use the defaults
         if table_folder == '':
@@ -71,16 +70,16 @@ class FlyTableManager():
 
         # if the table file does not exist, create a new one
         if not os.path.exists(os.path.join(self.table_folder, self.table_file)):
-            self.table = self._create_fly_table()   
+            self._create_fly_table()   
         else:
             # otherwise, get the existing one
-            self.table = self.get_fly_table() 
+            self._get_fly_table() 
 
 
 
     def _create_fly_table(self, log: LogManager = None):
         """ Create an empty fly processing table file and save it to the csv file.
-        Also return the table as self.table.
+        Also return the table as self.fly_table.
 
         Parameters
         ----------
@@ -89,7 +88,7 @@ class FlyTableManager():
         log : LogManager, optional
             If a log is provided, log the creation of the new table.
         
-        Returns
+        Generates
         -------
         self.fly_table : pandas.DataFrame
         """
@@ -112,13 +111,14 @@ class FlyTableManager():
         ----------
         self.table_folder : str
         self.table_file : str
+        self.fly_table : pandas.DataFrame
         """
 
         # get the path for the fly processing table
         table_path = os.path.join(self.table_folder, self.table_file)
 
         # save the dataframe to a csv file
-        self.table.to_csv(table_path, index=False)
+        self.fly_table.to_csv(table_path, index=False)
 
 
     def _get_fly_table(self):
@@ -130,9 +130,9 @@ class FlyTableManager():
         self.table_folder : str
         self.table_file : str
 
-        Returns
+        Generates
         -------
-        self.table : pandas.DataFrame
+        self.fly_table : pandas.DataFrame
         """
 
         # get the path for the fly processing table
@@ -144,7 +144,7 @@ class FlyTableManager():
 
         # otherwise read the table from the file
         else:
-            self.table = pd.read_csv(table_path)
+            self.fly_table = pd.read_csv(table_path)
 
 
     def _add_fly_to_fly_table(self, single_trial: dict):
@@ -152,9 +152,9 @@ class FlyTableManager():
 
         Parameters
         ----------
-        self.table : pandas.DataFrame
+        self.fly_table : pandas.DataFrame
         single_trial : dict
-            dictionary with a single fly TRIAL information (dir, trial)
+            dictionary with a single fly TRIAL information (fly_dir, trial)
 
         Returns
         ----------
@@ -162,21 +162,34 @@ class FlyTableManager():
             row index of new fly in the processing table. 
         """
 
+        # check that the input single_trial format is correct (only one trial)
+        if not all([key in single_trial for key in ["fly_dir", "trial"]]):
+            raise ValueError("Fly trial dictionary must have 'fly_dir' and 'trial' keys.")
+        if "," in single_trial["trial"]:
+            raise ValueError("Fly trial dictionary must have only one trial.")
+        
+        # check that the fly is not already in the table
+        if len(self.fly_table[
+            (self.fly_table["fly_dir"] == single_trial["fly_dir"]) & 
+            (self.fly_table["trial"] == single_trial["trial"])
+            ]) > 0:
+            raise ValueError("Fly trial already in the processing table.")
+
         # create the fly row and fill the non-task columns
         new_row = {
-            "fly_dir": single_trial["dir"],
+            "fly_dir": single_trial["fly_dir"],
             "trial": single_trial['trial'],
             "pipelines": ' ',
             "user": user_config["initials"],
             "comments": ' '
         }
         # Add a zero for each column in the table which isn't already in new_row (tasks)
-        for column in self.table.columns:
+        for column in self.fly_table.columns:
             if column not in new_row:
                 new_row[column] = 0
 
         # Append the new row to the fly table
-        self.table = pd.concat([self.table, pd.DataFrame([new_row])], ignore_index=True)
+        self.fly_table = pd.concat([self.fly_table, pd.DataFrame([new_row])], ignore_index=True)
 
         # save the table
         self._save_fly_table()
@@ -188,14 +201,14 @@ class FlyTableManager():
 
     def _find_fly_in_fly_table(self, single_trial: dict):
         """ Find a fly in the processing status table. 
-        If the fly doesn't exist, it add it to the table.
+        If the fly doesn't exist, add it to the table.
         First checks that input format is correct
 
         Parameters
         ----------
-        self.table : pandas.DataFrame
+        self.fly_table : pandas.DataFrame
         single_trial : dict
-            dictionary with a single fly TRIAL information (dir, trial)
+            dictionary with a single fly TRIAL information (fly_dir, trial)
         
         Returns
         -------
@@ -204,20 +217,20 @@ class FlyTableManager():
         """
 
         # check that the input single_trial format is correct (only one trial)
-        if not all([key in single_trial for key in ["dir", "trial"]]):
-            raise ValueError("Fly trial dictionary must have 'dir' and 'trial' keys.")
+        if not all([key in single_trial for key in ["fly_dir", "trial"]]):
+            raise ValueError("Fly trial dictionary must have 'fly_dir' and 'trial' keys.")
         if "," in single_trial["trial"]:
             raise ValueError("Fly trial dictionary must have only one trial.")
 
         # find the index of the fly trial in the processing table
-        fly_index = self.table[
-            (self.table["fly_dir"] == single_trial["dir"]) & 
-            (self.table["trial"] == single_trial["trial"])
+        fly_index = self.fly_table[
+            (self.fly_table["fly_dir"] == single_trial["fly_dir"]) & 
+            (self.fly_table["trial"] == single_trial["trial"])
         ].index
         
         # if the fly is not found, add it. This will return the new index.
         if len(fly_index) == 0:
-            fly_index = self._add_fly_to_fly_table(self, single_trial)
+            fly_index = self._add_fly_to_fly_table(single_trial)
         else:
             fly_index = fly_index[0]
         
@@ -230,18 +243,18 @@ class FlyTableManager():
 
         Parameters
         ----------
-        self.table : pandas.DataFrame
+        self.fly_table : pandas.DataFrame
         task : str
             name of task to add to table
         log : LogManager, optional
         """
 
         # add new task as empty column
-        self.table[task] = 0
+        self.fly_table[task] = 0
         
         # if log is provided, log the addition of new task
         if log is not None:
-            log.add_line(f"STATUS_TABLE: New task added to the fly processing table : {task}")
+            log.add_line_to_log(f"STATUS_TABLE: New task added to the fly processing table : {task}")
 
 
     def check_trial_task_status(self, single_trial: dict):
@@ -250,9 +263,9 @@ class FlyTableManager():
 
         Parameters
         ----------
-        self.table : pandas.DataFrame
+        self.fly_table : pandas.DataFrame
         single_trial : dict
-            dictionary with a single fly TRIAL+TASK information (dir, trial, task)
+            dictionary with a single fly TRIAL+TASK information (fly_dir, trial, task)
         
         Returns
         -------
@@ -264,11 +277,11 @@ class FlyTableManager():
         fly_index = self._find_fly_in_fly_table(single_trial)
 
         # check if the task exists in the table, if not return 0 (not done)
-        if single_trial['task'] not in self.table.columns:
+        if single_trial['task'] not in self.fly_table.columns:
             status = 0
         else:
             # get the status of the task for the fly trial
-            status = self.table.loc[fly_index, single_trial['task']]
+            status = self.fly_table.loc[fly_index, single_trial['task']]
 
         return status
 
@@ -280,9 +293,9 @@ class FlyTableManager():
 
         Parameters
         ----------
-        self.table : pandas.DataFrame
+        self.fly_table : pandas.DataFrame
         single_trial : dict
-            dictionary with a single fly TRIAL+TASK information (dir, trial, task)
+            dictionary with a single fly TRIAL+TASK information (fly_dir, trial, task)
         status : int
             status of the task for the fly trial (0 = not done, 1 = done, 2 = error)
         log : LogManager, optional
@@ -293,11 +306,11 @@ class FlyTableManager():
         fly_index = self._find_fly_in_fly_table(single_trial)
 
         # check if the task exists in the table, and if not, add it
-        if single_trial['task'] not in self.table.columns:
+        if single_trial['task'] not in self.fly_table.columns:
             self._add_new_task(single_trial['task'], log)
 
         # update the status of the task for the fly trial
-        self.table.loc[fly_index, single_trial['task']] = status
+        self.fly_table.loc[fly_index, single_trial['task']] = status
 
         # save the table
         self._save_fly_table()
