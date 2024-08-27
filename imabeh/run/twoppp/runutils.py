@@ -1,11 +1,6 @@
 """
 utility functions to run processing using the TaskManager
-
-Contains the following functions:
-    
-
 """
-
 import os
 import smtplib
 import ssl
@@ -16,44 +11,183 @@ from pexpect import pxssh
 from twoppp import load
 from twoppp.run.runparams import CURRENT_USER
 
-from imabeh.run.userpaths import get_current_user_config
-
-# get current user settings and paths
-user_config = get_current_user_config()
+LOCAL_DIR, _ = os.path.split(os.path.realpath(__file__))
 
 
+def get_selected_trials(fly_dict: dict, twoplinux_trial_names: List[str] = None) -> List[str]:
+    """
+    reads the "selected_trials" field of the fly_dict and returns a list of trial directories.
+    Supplying twoplinux_trial_names allows to add trial directories that have not yet been
+    copied to the local machine yet.
 
+    Parameters
+    ----------
+    fly_dict : dict
+        dictionary containing information about the fly.
+        Should have at least the following fields:
+        - "dir": the base directory of the fly
+        - "selected_trials": a string describing which trials to run on,
+                             e.g. "001,002" or "all_trials"
+    twoplinux_trial_names : List[str], optional
+        supply the names of trials found on the recording computer. This can help in the case
+        where the data has not been completely copied to the local machine yet. by default None
 
+    Returns
+    -------
+    List[str]
+        a list of trial directories
 
-def read_running_tasks(txt_file: str = str=user_config["_tasks_running.txt"]) -> List[dict]:
+    Raises
+    ------
+    NameError
+        In case fly_dict["selected_trials"] contains an entry that cannot be found.
+    """
+    trial_dirs = load.get_trials_from_fly(fly_dict["dir"], ignore_error=True)[0]
+    if twoplinux_trial_names is not None:
+        for trial_name in twoplinux_trial_names:
+            if not any([trial_dir.split(os.sep)[-1] == trial_name for trial_dir in trial_dirs]):
+                trial_dirs.append(os.path.join(fly_dict["dir"], trial_name))
+
+    if fly_dict["selected_trials"] == "all_trials":
+        selected_trials = trial_dirs
+    else:
+        split_comma = fly_dict["selected_trials"].split(",")
+        selected_trials = []
+        for trial_start in split_comma:
+            matched_trials = [trial_dir for trial_dir in trial_dirs
+                              if trial_dir.split(os.sep)[-1].startswith(trial_start)]
+            if len(matched_trials) == 1:
+                selected_trials += matched_trials
+            elif len(matched_trials) == 0:
+                raise NameError(f"Could not find trial that starts with {trial_start}" +\
+                                f" for fly dir {fly_dict['dir']}.\n"+
+                                f"Available trials: {trial_dirs}")
+    return selected_trials
+
+def split_fly_dict_trials(fly_dict: dict) -> List[dict]:
+    """splits a fly_dict with multiple trials into a list of dictionaries with one trial each
+
+    Parameters
+    ----------
+    fly_dict : dict
+        dictionary containing information about the fly.
+        Should have at least the following fields:
+        - "selected_trials": a string describing which trials to run on,
+                             e.g. "001,002" or "all_trials"
+    Returns
+    -------
+    List[dict]
+        a list of dictionaries like fly_dict,
+        but each containing only one trial in the "selected_trials" field
+    """
+    split_comma = fly_dict["selected_trials"].split(",")
+    if len(split_comma) == 1:
+        return [fly_dict]
+    else:
+        fly_dicts_split_trials = []
+        fly_dict_copy = deepcopy(fly_dict)
+        for trial in split_comma:
+            fly_dict_copy = deepcopy(fly_dict)
+            fly_dict_copy["selected_trials"] = trial
+            fly_dicts_split_trials.append(fly_dict_copy)
+        return fly_dicts_split_trials
+
+def get_scratch_fly_dict(fly_dict: dict, scratch_base: str) -> dict:
+    """
+    convert a local fly dict into one where the "dir" field points to the scratch directory
+    of the computing cluster that is mounted to the local computer
+
+    Parameters
+    ----------
+    fly_dict : dict
+        dictionary containing information about the fly.
+        Should have at least the following fields:
+        - "dir": the base directory of the fly
+    scratch_base : str
+        base directory of the
+
+    Returns
+    -------
+    dict
+        modified fly_dict
+    """
+    scratch_fly_dict = deepcopy(fly_dict)
+    dir_elements = scratch_fly_dict["dir"].split(os.sep)
+    scratch_fly_dir = os.path.join(scratch_base, *dir_elements[-2:])
+    scratch_fly_dict["dir"] = scratch_fly_dir
+    return scratch_fly_dict
+
+def read_fly_dirs(txt_file: str=os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt")) -> List[dict]:
     """
     reads the supplied text file and returns a list of dictionaries
-    with information for each task that is running. ONLY ONE TASK AND TRIAL EACH!
+    with information for each fly to process.
     General requested format of a line in the txt file:
-    fly_dir||trial1||task1
+    fly_dir||trial1,trial2||task1,task2,!task3||additional arguments,
+    ! before a task forces an overwrite.
     example:
-    /mnt/nas2/JB/date_genotype/Fly1||001_beh||fictrac
+    /mnt/nas2/JB/date_genotype/Fly1||all_trials||pre_cluster,fictrac,post_cluster,denoise,dff,!video
 
     Parameters
     ----------
     txt_file : str, optional
-        location of the text file, by default defined in imabeh/run/userpaths.py
+        location of the text file, by default os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt")
 
     Returns
     -------
-    running_tasks: List[dict]
-         list of trial dict with the following fields for each fly trial:
+    List[dict]
+        fly dict with the following fields:
         - "dir": the base directory of the fly
-        - "trial": which trial to run on
-        - "tasks": str of the task running
-    """
+        - "selected_trials": a string describing which trials to run on,
+                             e.g. "001,002" or "all_trials"
+        - "tasks": a comma separated string containing the names of the tasks todo
+        - "args": a list of additional arguments read from the text file.
 
-    # read file
+    """
     with open(txt_file) as file:
         lines = file.readlines()
         lines = [line.rstrip() for line in lines]
-    
-    # get running tasks
+    fly_dicts = []
+    for line in lines:
+        if line.startswith("#") or line == "":
+            continue
+        strings = line.split("||")
+        fly = {
+            "dir": strings[0],
+            "selected_trials": strings[1],
+            "tasks": strings[2],
+            "args": strings[3:] if len(strings) > 3 else [],
+            "todos": []
+        }
+        fly_dicts.append(fly)
+    return fly_dicts
+
+def read_running_tasks(txt_file: str = os.path.join(LOCAL_DIR, "_tasks_running.txt")) -> List[dict]:
+    """
+    reads the supplied text file and returns a list of dictionaries
+    with information for each task that is running.
+    General requested format of a line in the txt file:
+    fly_dir||trial1,trial2||task1||additional arguments,
+    example:
+    /mnt/nas2/JB/date_genotype/Fly1||all_trials||pre_cluster
+
+    Parameters
+    ----------
+    txt_file : str, optional
+        location of the text file, by default os.path.join(LOCAL_DIR, "_tasks_running.txt")
+
+    Returns
+    -------
+    List[dict]
+        fly dict with the following fields:
+        - "dir": the base directory of the fly
+        - "selected_trials": a string describing which trials to run on,
+                             e.g. "001,002" or "all_trials"
+        - "tasks": a tring containing the name of the task running
+        - "args": a list of additional arguments read from the text file.
+    """
+    with open(txt_file) as file:
+        lines = file.readlines()
+        lines = [line.rstrip() for line in lines]
     running_tasks = []
     for line in lines:
         if line.startswith("#") or line == "":
@@ -61,13 +195,12 @@ def read_running_tasks(txt_file: str = str=user_config["_tasks_running.txt"]) ->
         strings = line.split("||")
         fly = {
             "dir": strings[0],
-            "trial": strings[1],
-            "task": strings[2],
+            "selected_trials": strings[1],
+            "tasks": strings[2],
+            "args": strings[3:] if len(strings) > 3 else [],
         }
         running_tasks.append(fly)
-
     return running_tasks
-
 
 def write_running_tasks(task: dict, add: bool = True,
                         txt_file: str = os.path.join(LOCAL_DIR, "_tasks_running.txt")) -> None:
@@ -106,9 +239,6 @@ def write_running_tasks(task: dict, add: bool = True,
         with open(txt_file, "w") as file:
             for line in lines_to_write:
                 file.write(line+"\n")
-
-
-                ###############################################
 
 def check_task_running(fly_dict: dict, task_name: str, running_tasks: List[dict]) -> bool:
     """

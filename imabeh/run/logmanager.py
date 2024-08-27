@@ -48,6 +48,9 @@ class LogManager():
         if not os.path.exists(self.log_folder):
             os.makedirs(self.log_folder)
 
+        # create a new log upon initializing
+        self.create_task_log(self)
+
 
     def _delete_old_logs(self):
         """ Delete logs older than 14 days from the logs folder

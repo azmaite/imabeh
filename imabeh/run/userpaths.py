@@ -38,6 +38,8 @@ DEFAULT_PATHS = {
 
     # location of file with fly_dirs that should be processed
     "txt_file_to_process": os.path.join(LOCAL_DIR, "_fly_dirs_to_process.txt"),
+    # location of file with currently running tasks
+    "txt_file_running": os.path.join(LOCAL_DIR, "_tasks_running.txt"),
 }
 
 # settins for cameras of each scope
@@ -93,8 +95,7 @@ USER_MA_scape = {
 }
 
 
-
-def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
+def get_current_user_config(txt_file = GLOBAL_PATHS["txt_current_user"]):
     """
     Reads the supplied text file and returns the current user name,
     as well as the user specific paths/settings from the userpaths.py file.
@@ -148,8 +149,9 @@ def read_current_user(txt_file = GLOBAL_PATHS["txt_current_user"]):
     userpaths_module = importlib.import_module('imabeh.run.userpaths')
     user_settings = getattr(userpaths_module, current_user)
 
-    # Combine the default paths with the user scope settings
-    user_config = DEFAULT_PATHS.copy()
+    # Combine the global paths with the default paths and the user scope settings
+    user_config = GLOBAL_PATHS.copy()
+    user_config.update(DEFAULT_PATHS)
     user_config.update(SCOPE_CONFIG[user_settings["scope"]])
     # combine the prior settings with the user specific settings (prioritizing the user settings)
     user_config.update(user_settings)

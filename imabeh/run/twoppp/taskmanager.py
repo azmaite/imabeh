@@ -5,7 +5,6 @@ from copy import deepcopy
 from typing import List, Dict
 import time
 import numpy as np
-import datetime
 
 from twoppp.pipeline import PreProcessParams
 
@@ -195,21 +194,6 @@ class TaskManager():
         self.todo_dicts = sorted(self.todo_dicts,
                                  key=lambda todo: -1*self.task_collection[todo["tasks"]].prio)
 
-    def log_failed_task(self, task_name: str, exception: Exception) -> None:
-        """
-        Log the failed task to a text file with the date and time.
-
-        Parameters
-        ----------
-        task_name : str
-            The name of the task that failed.
-        exception : Exception
-            The exception that was raised.
-        """
-        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("failed_tasks.txt", "a") as f:
-            f.write(f"[{current_time}] Task {task_name} failed with exception: {exception}\n")
-
     def execute_next_task(self) -> bool:
         """
         execute the todo from self.todo_dicts with the highest priority that is not waiting.
@@ -227,21 +211,14 @@ class TaskManager():
             task_name = next_todo["tasks"]
             write_running_tasks(next_todo, add=True)
             self.todo_dicts[i_todo]["status"] = "running"
-            try:
-                result = self.task_collection[task_name].run(fly_dict=next_todo, params=self.params)
-                if result:
-                    self.todo_dicts[i_todo]["status"] = "done"
-                    self.remove_todo(i_todo)
-                    return True
-                else:
-                    self.todo_dicts[i_todo]["status"] = "waiting"
-                    write_running_tasks(next_todo, add=False)
-            except Exception as e:
-                # Log the exception and continue with the next task
-                print(f"Task {task_name} failed with exception: {e}")
-                self.todo_dicts[i_todo]["status"] = "failed"
+            result = self.task_collection[task_name].run(fly_dict=next_todo, params=self.params)
+            if result:
+                self.todo_dicts[i_todo]["status"] = "done"
+                self.remove_todo(i_todo)
+                return True
+            else:
+                self.todo_dicts[i_todo]["status"] = "waiting"
                 write_running_tasks(next_todo, add=False)
-                self.log_failed_task(task_name, e)
         return False
 
     def run(self) -> None:
@@ -252,7 +229,6 @@ class TaskManager():
             while self.n_todos:
                 success = self.execute_next_task()
                 if not success:
-                    print('Waiting because of error - Check that sync file exists in folder.')
                     # if all tasks are pending wait before checking from start again
                     time.sleep(self.t_wait_s)
             self.clean_exit = True
