@@ -31,10 +31,10 @@ class TaskManager():
         task_collection: Dict[str, Task] = task_collection
     ) -> None:
         """
-        Most important component is a table of tasks todo that is managed: self.todo_table
-        A "todo" ITEM IS DEFINED AS A SINGLE TASK TO BE RUN ON A SINGLE TRIAL
-        Each todo item (row in the table) will have the following fields:
-            - index: the index of the todo in the order of tasks to run 
+        Most important component is a table of tasks torun that is managed: self.torun_table
+        A "torun" ITEM IS DEFINED AS A SINGLE TASK TO BE RUN ON A SINGLE TRIAL
+        Each torun item (row in the table) will have the following fields:
+            - index: the index of the torun in the order of tasks to run 
             - dir: the base directory of the fly, where the data is stored
             - trial: the fly trial to analyze
             - task: the name of the task to be done. Later used to index in self.task_collection
@@ -70,27 +70,27 @@ class TaskManager():
         self.trials_to_process = []
         self._read_fly_dirs(self.txt_file_to_process)
 
-        # todo_table: table of tasks to run on trials (todos)
-        # each row is a todo, with columns: fly_dir, trial, task, overwrite, status
-        self._create_todo_table(log)
+        # torun_table: table of tasks to run on trials (toruns)
+        # each row is a torun, with columns: fly_dir, trial, task, overwrite, status
+        self._create_torun_table(log)
    
     @property
-    def n_todos(self) -> int:
+    def n_toruns(self) -> int:
         """
-        get the number of todo items as rows in self.todo_table
+        get the number of torun items as rows in self.torun_table
 
         Returns
         -------
         int
         """
-        return len(self.todo_table)
+        return len(self.torun_table)
 
 
 
     def _read_fly_dirs(self, txt_file: str) -> List[dict]:
         """
         reads the supplied text file and returns a list of dictionaries with information for each fly trial to process.
-        USED ONLY ONCE AT START
+        USED ONLY ONCE AT START (.__init__)
 
         General requested format of a line in the txt file: fly_dir||trial1,trial2||task1,task2,!task3
         ! before a task forces an overwrite.
@@ -137,10 +137,10 @@ class TaskManager():
         self.trials_to_process = trial_dicts
 
 
-    def _add_todos_from_trial(self, trial_dict : dict):
+    def _add_toruns_from_trial(self, trial_dict : dict):
         """
-        function to append new todos as rows to self.todo_table from a trial_dict
-        USED ONLY ONCE AT START
+        function to append new toruns as rows to self.torun_table from a trial_dict
+        USED ONLY ONCE AT START (.__init__)
 
         will check if task needs to be overwritten (! at start of task name)
         adds an index to indicate the order in which the tasks must be run - 
@@ -155,45 +155,45 @@ class TaskManager():
             - "tasks": a comma separated string containing the names of the tasks to run
         Generates
         -------
-            new rows in self.todo_table, one for each task in the trial_dict
+            new rows in self.torun_table, one for each task in the trial_dict
         """
 
         # split tasks
         task_list = trial_dict["tasks"].split(',')
 
-        # get last todo order in table
-        order = self.todo_table.index.max()
-        # check if nan (no todos yet)
+        # get last torun order in table
+        order = self.torun_table.index.max()
+        # check if nan (no toruns yet)
         if np.isnan(order):
             order = -1
 
-        # for each task, make a new todo dict (will become a row)
+        # for each task, make a new torun dict (will become a row)
         for task_name in task_list:
-            new_todo = deepcopy(trial_dict)
+            new_torun = deepcopy(trial_dict)
 
             # check if tasks must be overwritten
             if task_name.startswith("!"):
-                new_todo["task"] = task_name[1:]
-                new_todo["overwrite"] = True
+                new_torun["task"] = task_name[1:]
+                new_torun["overwrite"] = True
             else:
-                new_todo["task"] = task_name
-                new_todo["overwrite"] = False
+                new_torun["task"] = task_name
+                new_torun["overwrite"] = False
 
             # set status to ready (default)
-            new_todo["status"] = "ready"
+            new_torun["status"] = "ready"
            
-            # add todo to table as new row
+            # add torun to table as new row
             order += 1
-            self.todo_table.loc[order] = (new_todo)
+            self.torun_table.loc[order] = (new_torun)
         
         # sort indexes (order)
-        self.todo_table = self.todo_table.sort_index()
+        self.torun_table = self.torun_table.sort_index()
 
 
-    def _create_todo_table(self, log: LogManager):
+    def _create_torun_table(self, log: LogManager):
         """
-        create the todo_table from the list of self.trials_to_process
-        USED ONLY ONCE AT START
+        create the torun_table from the list of self.trials_to_process
+        USED ONLY ONCE AT START (.__init__)
 
         checks if tasks have been completed previously. If so, checks if they need to be overwritten.
             if already completed and overwrite = False, log and remove from list of to_run
@@ -203,119 +203,215 @@ class TaskManager():
 
         Parameters
         ----------
-        log: LogManager to log the creation of the todo_table
+        log: LogManager to log the creation of the torun_table
 
         Generates
         -------
-        self.todo_table with the following columns, containing the todos from self.trials_to_process:
+        self.torun_table with the following columns, containing the toruns from self.trials_to_process:
             - "fly_dir": the base directory of the fly
             - "trial": which trial to run on
             - "task": the name of the task to run
         """
         # create empty table
         header = ["fly_dir", "trial", "task", "overwrite", "status"]
-        self.todo_table = pd.DataFrame(columns=header)
-        # fill with new todos
+        self.torun_table = pd.DataFrame(columns=header)
+        # fill with new toruns
         for trial_dict in self.trials_to_process:
-            self._add_todos_from_trial(trial_dict)
+            self._add_toruns_from_trial(trial_dict)
 
-        # iterate over todos to check task status, overwriting and prerequisites
-        for todo_index, todo in self.todo_table.iterrows():
-            # convert todo to dict
-            todo_dict = todo.to_dict()
+        # check if there are duplicate toruns
+        # if so, remove duplicates - prioritise the first one in list
+        self._check_duplicates(log)
+
+        # iterate over toruns to check task status, overwriting and prerequisites
+        # iterate from end to start to avoid reordering issues
+        for torun_index, torun in self.torun_table[::-1].iterrows():
+
+            # convert torun to dict
+            torun_dict = torun.to_dict()
 
             # check if any tasks have been completed previously (without errors) using the fly table
-            table_status = self.fly_table.check_trial_task_status(todo_dict)
+            table_status = self.fly_table.check_trial_task_status(torun_dict)
             # if already completed and overwrite = False, log and remove from list of to_run
-            if table_status == 1 and todo.overwrite == False: # 1 = done
-                self._remove_todo(todo_dict, log)
+            if table_status == 1 and torun.overwrite == False: # 1 = done
+                self._remove_torun(torun_dict, log)
             # if already completed and overwrite = True, change status in fly_table to 2
-            elif table_status == 1 and todo.overwrite == True: 
-                self.fly_table.update_trial_task_status(todo_dict, status = 2)
+            elif table_status == 1 and torun.overwrite == True: 
+                self.fly_table.update_trial_task_status(torun_dict, status = 2)
         
             # check the pre-requisites for each task and set statuses acordingly
             # "ready" if all pre-requisites are met, "waiting" otherwise
-            self._check_prerequisites(todo, todo_index)
+            # alsor remove if prerequisites are missing
+            self._check_prerequisites(torun, torun_index, log)
 
 
-    def _remove_todo(self, todo_dict : dict, log: LogManager):
+    def _find_torun_in_table(self, torun_dict : dict) -> int:
         """
-        function to remove a todo row from the self.todo_table
+        find the index of a torun in the self.torun_table
+        USED IN MANY OTHER FUNCTIONS
+
+        Parameters
+        ----------
+        torun_dict: dict
+            torun dict with the following fields:
+            - "fly_dir": the base directory of the fly
+            - "trial": which trial to run on
+            - "task": the name of the task to run
+
+        Returns
+        -------
+        row.index : int
+            index of the torun in the torun_table
+        """
+
+        # find row that matches torun_dict
+        row = self.torun_table.loc[
+            (self.torun_table["fly_dir"] == torun_dict["fly_dir"]) &  
+            (self.torun_table["trial"] == torun_dict["trial"]) & 
+            (self.torun_table["task"] == torun_dict["task"])
+        ]
+        # if no match, return None
+        if row.empty:
+            return None
+        else:
+            # return index
+            return row.index
+    
+
+    def _remove_torun(self, torun_dict : dict, log: LogManager):
+        """
+        function to remove a torun row from the self.torun_table
         USED AT START IF TASK HAS BEEN COMPLETED PREVIOUSLY AND OVERWRITE = FALSE
         ALSO USED AFTER A TASK HAS BEEN COMPLETED
 
         Parameters
         ----------
-        todo_dict: dict
-            todo dict with the following fields:
+        torun_dict: dict
+            torun dict with the following fields:
             - "fly_dir": the base directory of the fly
             - "trial": which trial to run on
             - "task": the name of the task to run
             log: LogManager to log the removal
         Generates
         -------
-            removes the row from self.todo_table
+            removes the row from self.torun_table
         """
 
-       # find row that matches todo_dict
-        row = self.todo_table.loc[
-            (self.todo_table["fly_dir"] == todo_dict["fly_dir"]) &  
-            (self.todo_table["trial"] == todo_dict["trial"]) & 
-            (self.todo_table["tasks"] == todo_dict["tasks"])
-        ]
-
+        # find row index that matches torun_dict
+        torun_index = self._find_torun_in_table(torun_dict)
+    
         # remove row
-        self.todo_table = self.todo_table.drop(row.index)
+        self.torun_table = self.torun_table.drop(torun_index)
 
         # log removal
-        LogManager.add_line_to_log(log, f"Removed task {todo_dict['task']} for fly {todo_dict['fly_dir']} trial {todo_dict['trial']} from todo_table.")
+        log.add_line_to_log(f"Removed task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' from torun_table.")
+        log.add_line_to_log("\n")
 
 
-    def _check_prerequisites(self, todo, todo_index) -> bool:
+    def _check_duplicates(self, log: LogManager):
+        """ 
+        function to check for duplicates in the torun_table and remove them
+        priority is given to the first torun in the list (in case overwritting is different)
+        USED AT START TO CLEAN UP THE torun_table (.__init__)
+
+        Parameters
+        ----------
+        log: LogManager to log the removal of duplicates
+
+        Generates
+        -------
+            removes duplicates from the torun_table
         """
-        check if all the prerequisites for a task are met and set statuses acordingly
-        "ready" if all pre-requisites are met, "waiting" otherwise
+        # set columns to consider when checking for duplicates
+        columns_to_check = ["fly_dir", "trial", "task"]
+        # find duplicates
+        duplicates_exist = self.torun_table.duplicated(subset=columns_to_check).any()
+
+        # if duplicates exist, log and remove
+        if duplicates_exist:
+            log.add_line_to_log("WARNING: Duplicate toruns found in torun_table. Removing duplicates.")
+            log.add_line_to_log("\n")
+            self.torun_table = self.torun_table.drop_duplicates(subset=columns_to_check)
+            
+
+    def _check_prerequisites(self, torun, torun_index, log : LogManager) -> bool:
+        """
+        function to check if all the prerequisites for a task are met and set statuses/remove toruns acordingly
+        "ready" if all pre-requisites are met, "waiting" otherwise.
+        Checks that all incomplete prerequisites for each task are in the torun_table,
+        and that they are earlier in the order than the task in question.
+            if the prerequisites are missing, log and remove
+            if they are present but below the task, log and remove
         WILL BE USED AT START AND BEFORE THE NEXT TASK IS CHOSEN TO RUN
 
         Parameters
         ----------
-        todo : pandas.Series row
-            todo table row with the following columns:
+        torun : pandas.Series row
+            torun table row with the following columns:
             - "fly_dir": the base directory of the fly
             - "trial": which trial to run on
             - "task": the name of the task to run
-        todo_index : index of the todo row in the todo_table
+        torun_index : index of the torun row in the torun_table
+        log: LogManager to log any reordering/removal
 
         Generates
         -------
-            changes the status of the todo in the todo_table based on prerequisite status
+            changes the status of/removes the torun in the torun_table based on prerequisite status
         """
 
-        # convert todo to dict
-        todo_dict = todo.to_dict()
+        # convert torun to dict
+        torun_dict = torun.to_dict()
         # get the task
-        task = self.task_collection[todo_dict["task"]]()
-        # get the prerequisites
+        task = self.task_collection[torun_dict["task"]]()
+        # get the prerequisites for the task
         prerequisites = task.prerequisites
-        # check if all prerequisite tasks have been completed
-        prereq_done = True
+        print(prerequisites)
+
+        # check if all prerequisite tasks have been completed previously
+        prereqs_missing = []
         for prereq in prerequisites:
-            prereq_dict = deepcopy(todo_dict)
+            prereq_dict = deepcopy(torun_dict)
             prereq_dict["task"] = prereq
-            prereq_status = self.fly_table.check_trial_task_status(todo_dict)
+            prereq_status = self.fly_table.check_trial_task_status(torun_dict)
             if prereq_status != 1:
-                prereq_done = False
-                break
-        # set status to "ready" if all prerequisites are met, "waiting" otherwise
-        if not prereq_done:
-            self.todo_table.loc[todo_index, "status"] = "waiting"
+                prereqs_missing.append(prereq)
+        print(prereqs_missing)
+
+        # if some prerequisites have not yet been completed, check if they are in the torun_table
+        # and if they are before the task in question
+        # if not, remove the task and log
+        if prereqs_missing:
+            all_prereqs_present = True
+
+            for prereq in prereqs_missing:
+                # find prereq in torun_table
+                prereq_dict = deepcopy(torun_dict)
+                prereq_dict["task"] = prereq
+                prereq_index = self._find_torun_in_table(prereq_dict)
+
+                # if missing, remove the task and log
+                if prereq_index is None:
+                    log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is missing. Removing task.")
+                    self._remove_torun(torun_dict, log)
+                    all_prereqs_present = False
+                    break
+
+                # if present, check if it is before the task. If not, remove
+                elif prereq_index > torun_index:
+                    log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is after the task. Removing task.")
+                    self._remove_torun(torun_dict, log)
+                    all_prereqs_present = False 
+                    break
+
+            # if all prereqs are present and before the task, set status to "waiting" 
+            # (vs default 'ready' for tasks with no incomplete prerequisites)
+            if all_prereqs_present:
+                self.torun_table.loc[torun_index, "status"] = "waiting"
         
-
-
 
     # def execute_next_task(self) -> bool:
     #     """
-    #     Execute the next todo from self.todo_dicts that is not waiting.
+    #     Execute the next torun from self.torun_dicts that is not waiting.
 
     #     Returns
     #     -------
@@ -325,24 +421,24 @@ class TaskManager():
 
     #     result = False
 
-    #     for i_todo, next_todo in enumerate(self.todo_dicts):
-    #         task_name = next_todo["tasks"]
-    #         write_running_tasks(next_todo, add=True)
-    #         self.todo_dicts[i_todo]["status"] = "running"
+    #     for i_torun, next_torun in enumerate(self.torun_dicts):
+    #         task_name = next_torun["tasks"]
+    #         write_running_tasks(next_torun, add=True)
+    #         self.torun_dicts[i_torun]["status"] = "running"
     #         try:
-    #             result = self.task_collection[task_name].run(fly_dict=next_todo, params=self.params)
+    #             result = self.task_collection[task_name].run(fly_dict=next_torun, params=self.params)
     #             if result:
-    #                 self.todo_dicts[i_todo]["status"] = "done"
-    #                 self.remove_todo(i_todo)
+    #                 self.torun_dicts[i_torun]["status"] = "done"
+    #                 self.remove_torun(i_torun)
     #                 return True
     #             else:
-    #                 self.todo_dicts[i_todo]["status"] = "waiting"
-    #                 write_running_tasks(next_todo, add=False)
+    #                 self.torun_dicts[i_torun]["status"] = "waiting"
+    #                 write_running_tasks(next_torun, add=False)
     #         except Exception as e:
     #             # Log the exception and continue with the next task
     #             print(f"Task {task_name} failed with exception: {e}")
-    #             self.todo_dicts[i_todo]["status"] = "failed"
-    #             write_running_tasks(next_todo, add=False)
+    #             self.torun_dicts[i_torun]["status"] = "failed"
+    #             write_running_tasks(next_torun, add=False)
     #             self.log_failed_task(task_name, e)
     #     return False
 
@@ -352,28 +448,23 @@ class TaskManager():
 
 
 
-    # def run(self) -> None:
-    #     """
-    #     run the tasks manager to sequentially process all todos from self.todo_dicts.
-    #     """
-    #     try:
-    #         # check if there are tasks left to run
-    #         while self.n_todos:
-    #             # run the next task and check if it works
-    #             success = self.execute_next_task()
+    def run(self, log) -> None:
+        """
+        run the tasks manager to sequentially process all toruns from self.torun_dicts.
+        """
 
-    #             if not success:
-    #                 print('Waiting for pending tasks...')
-    #                 # if all tasks are pending wait before checking from the start again
-    #                 time.sleep(self.t_wait_s)
+        try:
+            # check if there are tasks left to run
+            while self.n_toruns:
+                # run the next task and check if it works
+                success = self.execute_next_task()
 
-    #         self.clean_exit = True
+                if not success:
+                    print('Waiting for pending tasks...')
+                    # if all tasks are pending wait before checking from the start again
+                    time.sleep(self.t_wait_s)
 
-    #     finally:
-    #         print("TASK MANAGER clean up: removing tasks from _tasks_running.txt")
-    #         for todo in self.todo_dicts:
-    #             if todo["status"] == "running":
-    #                 write_running_tasks(todo, add=False)
-    #         subject = "TASK MANAGER clean exit" if self.clean_exit else "TASK MANAGER error exit"
-    #         if self.user_config["send_emails"]:
-    #             send_email(subject, "no msg", receiver_email=self.user_config["email"])
+            self.clean_exit = True
+
+        finally:
+            log.add_line_to_log("Task manager finished.")

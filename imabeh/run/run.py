@@ -24,7 +24,7 @@ def main() -> None:
     log = create_task_log()
     
     # initialize task manager
-    task_manager = TaskManager(task_collection, params=global_params, user_config=user_config, log)
+    task_manager = TaskManager(log, user_config, task_collection) ######### FIX params=global_params, 
 
     # log start of processing and list of tasks to do
     log.add_line_to_log("START: Will start task manager with the following tasks:")
@@ -33,7 +33,7 @@ def main() -> None:
     log.add_line_to_log("\n")
 
     # run task manager
-    task_manager.run()
+    task_manager.run(log)
 
 if __name__ == "__main__":
     main()
