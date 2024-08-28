@@ -4,8 +4,8 @@ task manager module housing the TaskManager class
 from copy import deepcopy
 from typing import List, Dict
 import time
+from datetime import datetime
 import numpy as np
-import datetime
 import pandas as pd
 
 
@@ -514,7 +514,7 @@ class TaskManager():
 
                     # if any tasks finished correctly (1), remove from table and update flyTable
                     if finished == 1:
-                        log.add_line_to_log(f"Task '{torun['task']}' for fly '{torun['fly_dir']}' trial '{torun['trial']}' finished correctly.")
+                        log.add_line_to_log(f"Finished '{torun['task']}' task for trial '{torun['fly_dir']}/{torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
                         self._remove_torun(torun, log)
                         self.fly_table.update_trial_task_status(torun, status = 1)
                         any_finished = True

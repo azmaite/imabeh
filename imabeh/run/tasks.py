@@ -8,7 +8,7 @@ import os
 import time
 # import shutil
 # from copy import deepcopy
-# import datetime
+from datetime import datetime
 # from typing import List
 # import numpy as np
 # import h5py
@@ -68,11 +68,11 @@ class Task:
         trial_path = os.path.join(torun_dict['fly_dir'], torun_dict['trial'])
         
         # log the start of the task in general log
-        log.add_line_to_log(f"{time.ctime(time.time())}: starting {self.name} task for trial {trial_path}")
+        log.add_line_to_log(f"Starting {self.name} task for trial {trial_path} @ {datetime.now().isoformat(sep=' ')}")
 
         # log that the task is running into the taskstatus log file (create a new log)
         task_log = LogManager(log_name = f"_task_{self.name}_status")
-        task_log.add_line_to_log("running started at " + time.ctime(time.time()))
+        task_log.add_line_to_log("running started at " + datetime.now().isoformat(sep=' '))
 
         try:
             # RUN TASK!!!
