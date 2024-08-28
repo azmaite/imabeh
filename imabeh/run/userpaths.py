@@ -157,3 +157,5 @@ def get_current_user_config(txt_file = GLOBAL_PATHS["txt_current_user"]):
     user_config.update(user_settings)
 
     return user_config
+
+user_config = get_current_user_config()

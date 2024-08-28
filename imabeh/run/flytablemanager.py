@@ -29,11 +29,8 @@ Will optionally log the creation of a new table and the addition of new tasks us
 import os
 import pandas as pd
 
-from imabeh.run.userpaths import LOCAL_DIR, get_current_user_config
+from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 from imabeh.run.logmanager import LogManager
-
-# get the current user configuration (paths and settings)
-user_config = get_current_user_config()
 
 
 class FlyTableManager():

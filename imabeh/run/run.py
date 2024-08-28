@@ -5,15 +5,13 @@ See the README.md file in the same folder for usage instructions
 """
 
 ################
-from imabeh.run.runparams import global_params ######### FIX
+#from imabeh.run.runparams import global_params ######### FIX
 
 from imabeh.run.tasks import task_collection
 from imabeh.run.taskmanager import TaskManager
 from imabeh.run.logmanager import create_task_log, add_line_to_log
-from imabeh.run.userpaths import get_current_user_config
+from imabeh.run.userpaths import user_config # get the current user configuration (paths and settings)
 
-# get current user settings and paths
-user_config = get_current_user_config()
 
 def main() -> None:
     """

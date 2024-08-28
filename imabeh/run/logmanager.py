@@ -4,6 +4,7 @@ Manages the logs to keep track of processing status, timing and errors.
 
 Logs will be saved within the imabeh/run/logs folder (default) as txt files,
 named usign the time of creating as 'log_date_time.txt'.
+Optionally, the user can change the name of the log to 'customname_date_time.txt'.
 
 The LogManager class contains the followingfunctions:
     _delete_old_logs - Delete old log files (> 14 days old)
@@ -21,7 +22,7 @@ class LogManager():
     """
     class to manage task execution logs
     """
-    def __init__(self, log_folder: str = '') -> None:
+    def __init__(self, log_folder: str = '', log_name: str = 'log') -> None:
         """
         class to create, update, and delete execution logs
 
@@ -29,6 +30,8 @@ class LogManager():
         ----------
         log_folder : str
             path to the folder where the logs are stored
+        log_name : str
+            name of the log file (to be appended with the date and time) - default is 'log'
         
         Other properties
         ----------------
@@ -49,7 +52,7 @@ class LogManager():
             os.makedirs(self.log_folder)
 
         # create a new log upon initializing
-        self.create_task_log()
+        self.create_task_log(log_name=log_name)
 
 
     def _delete_old_logs(self):
@@ -61,26 +64,31 @@ class LogManager():
         log_files = os.listdir(self.log_folder)
 
         for log_file in log_files:
-            # Get log file creation date from file name
-            log_date = pd.to_datetime(log_file[4:19], format='%Y%m%d_%H%M%S')
+            # Get log file creation date from file name (last 15 characters)
+            log_date = pd.to_datetime(log_file[-19:-4], format='%Y%m%d_%H%M%S')
             
             # Delete if older than 14 days
             if pd.Timestamp.now() - log_date > pd.Timedelta(days=14):
                 os.remove(os.path.join(self.log_folder, log_file))
 
 
-    def create_task_log(self):
+    def create_task_log(self, log_name: str):
         """ Create new log file with the current date and time. 
         Saves the new log file name in the task manager object.
         Also checks for and deletes old logs.
+
+        Parameters
+        ----------
+        log_name : str
+            name of the log file (to be appended with the date and time) - default is 'log'
         """
 
         # delete old logs (to avoid having too many old log files)
         self._delete_old_logs()
 
-        # name the task log using current datetime
+        # name the task log using current datetime and the provided name
         now = pd.Timestamp.now()
-        self.log_file = 'log_' + now.strftime("%Y%m%d_%H%M%S") + '.txt'
+        self.log_file = log_name + '_' + now.strftime("%Y%m%d_%H%M%S") + '.txt'
         
         # create a new task log file
         log_file_path = os.path.join(self.log_folder, self.log_file)
@@ -91,6 +99,7 @@ class LogManager():
 
     def add_line_to_log(self, line: str):
         """ Add a line to the current task log file.
+        Also prints it to the console.
         
         Parameters
         ----------
@@ -102,3 +111,6 @@ class LogManager():
         log_file_path = os.path.join(self.log_folder, self.log_file)
         with open(log_file_path, "a") as file:
             file.write(line + '\n')
+
+        # print the line to the console
+        print(line)
