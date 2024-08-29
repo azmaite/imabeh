@@ -1,7 +1,7 @@
 """
-General utils to work with 2p imaging data.
+General utils functions to work with 2p imaging data.
 
-COPIED FROM UTILS2p (almost identical) - changes:
+COPIED FROM NeLy-EPFL/utils2p (almost identical) - changes:
 - updated to newer version of tifffile
 - edited create_tiffs to work with either 1 or 2 channels
 

@@ -5,7 +5,8 @@ FUNCTIONS TO FIND BEHAVIOR SPECIFIC FILES
     - find_seven_camera_metadata_file
     - find_fictrac_file
 
-FUNCTIONS TO LOAD DATA
+FUNCTIONS TO LOAD DATA OR METADATA
+    - 
     - load_fictrac
 """
 
@@ -62,6 +63,8 @@ def find_fictrac_file(directory, camera=3):
 
 
 # FUNCTIONS TO LOAD DATA
+
+
 
 def load_fictrac(path, ball_radius=5, fps=100):
     """
