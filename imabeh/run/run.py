@@ -9,7 +9,7 @@ See the README.md file in the same folder for usage instructions
 
 from imabeh.run.tasks import task_collection
 from imabeh.run.taskmanager import TaskManager
-from imabeh.run.logmanager import create_task_log, add_line_to_log
+from imabeh.run.logmanager import LogManager
 from imabeh.run.userpaths import user_config # get the current user configuration (paths and settings)
 
 
@@ -19,16 +19,15 @@ def main() -> None:
     """
 
     # create log
-    log = create_task_log()
+    log = LogManager()
     
     # initialize task manager
     task_manager = TaskManager(log, user_config, task_collection) ######### FIX params=global_params, 
 
     # log start of processing and list of tasks to do
-    log.add_line_to_log("START: Will start task manager with the following tasks:")
-    for todo_dict in task_manager.todo_dicts:
-        log.add_line_to_log(f"   {todo_dict['tasks']}: {todo_dict['dir']}")
-    log.add_line_to_log("\n")
+    log.add_line_to_log("Will start task manager with the following tasks:")
+    for _, torun in task_manager.torun_table.iterrows():
+        log.add_line_to_log(f"   {torun.task}: {torun.fly_dir} / {torun.trial}")
 
     # run task manager
     task_manager.run(log)
