@@ -6,28 +6,12 @@ List of all available tasks is defined in task_collection at the bottom (automat
 """
 import os
 import time
-# import shutil
-# from copy import deepcopy
 from datetime import datetime
-# from typing import List
-# import numpy as np
-# import h5py
-
-# from twoppp import load, utils, TWOPPP_PATH
-# from twoppp.register import warping
-# from twoppp.pipeline import PreProcessFly, PreProcessParams
-# from twoppp.behaviour.fictrac import config_and_run_fictrac
-# from twoppp.behaviour.stimulation import get_sync_signals_stimulation, get_beh_info_to_twop_df, add_beh_state_to_twop_df
-# from twoppp.behaviour.olfaction import get_sync_signals_olfaction
-# from twoppp.behaviour.sleap import prepare_sleap, run_sleap, add_sleap_to_beh_df
-# from twoppp.rois import prepare_roi_selection
-# from twoppp.plot import show3d
-# from twoppp.run.runparams import global_params, CURRENT_USER
-# from twoppp.run.runutils import get_selected_trials, get_scratch_fly_dict, find_trials_2plinux
-# from twoppp.run.runutils import send_email,split_fly_dict_trials
 
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 from imabeh.run.logmanager import LogManager
+
+from imabeh.imaging.main import create_tiffs
 
 
 class Task:
@@ -41,6 +25,10 @@ class Task:
         self.name = ""
         self.params = None
         self.prerequisites = []
+    
+    def full_path(self, torun_dict):
+        """ get full path of trial, using user_config.labserver_data """
+        return os.path.join(user_config["labserver_data"], torun_dict['fly_dir'], torun_dict['trial'])
     
 
     def start_run(self, torun_dict : dict, log : LogManager) -> str:
@@ -76,20 +64,21 @@ class Task:
 
         try:
             # RUN TASK!!!
-            self._run(trial_path)
+            self._run(torun_dict)
 
             # log the correct end of the task
             task_log.add_line_to_log("finished successfully at " + time.ctime(time.time()))
 
-        except:
+        except Exception as e:
             # log the failure of the task
             task_log.add_line_to_log("failed at " + time.ctime(time.time()))
+            task_log.add_line_to_log(f"  Error: {e}")
 
         # return the path to the taskstatus log file
         return os.path.join(task_log.log_folder,task_log.log_file)
 
 
-    def _run(self, trial_path):
+    def _run(self, torun_dict) -> bool:
         """
         abstract method to be re-used in each Task subclass to actually run the task
         """
@@ -128,7 +117,7 @@ class Task:
             # delete the taskstatus log file
             os.remove(task_log)
             return 1
-        elif last_line.startswith("failed"):
+        elif last_line.startswith("failed") or last_line.startswith("  Error"):
             return 2
         elif last_line.startswith("running"):
             return 0
@@ -150,12 +139,11 @@ class TestTask1(Task):
         self.name = "test1"
         self.prerequisites = []
 
-    def _run(self, trial_path) -> bool:
+    def _run(self, torun_dict) -> bool:
         # RUN TASK!!!
-        print(f"    Running {self.name} task on {trial_path}")
+        print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
         print(f"    {self.name} task done")
-
 
 class TestTask2(Task):
     """ Useless task 2 for testing purposes.
@@ -166,12 +154,26 @@ class TestTask2(Task):
         self.name = "test2"
         self.prerequisites = ['test1']
 
-    def _run(self, trial_path) -> bool:
+    def _run(self, torun_dict) -> bool:
         # RUN TASK!!!
-        print(f"    Running {self.name} task on {trial_path}")
+        print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
         print(f"    {self.name} task 2 done")
     
+class TifTask(Task):
+    """
+    Task to convert .raw files to .tif files
+    """
+    def __init__(self, prio=0):
+        self.name = "tif"
+        self.prerequisites = []
+
+    def _run(self, torun_dict):
+        # convert raw to tiff
+        full_path = self.full_path(torun_dict)
+        create_tiffs(full_path)
+
+
 
 # # TEMPLATE FOR NEW TASKS
 # class TaskName(Task):
@@ -183,7 +185,7 @@ class TestTask2(Task):
 #         self.name = "name"
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
-#     def run(self, trial_path) -> bool:
+#     def _run(self, trial_path) -> bool:
 #         # enter functions to run here
 #         # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
         
