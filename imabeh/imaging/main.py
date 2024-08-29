@@ -1,5 +1,10 @@
 """
-COPIED FROM UTILS2p (almost identical)
+General utils to work with 2p imaging data.
+
+COPIED FROM UTILS2p (almost identical) - changes:
+- updated to newer version of tifffile
+- edited create_tiffs to work with either 1 or 2 channels
+
 
 Available functions:
 
@@ -23,13 +28,14 @@ Available functions:
 
 * FUNCTIONS TO PROCESS DATA (most useful)
     - create_tiffs
-
 """
 
 import os
 import numpy as np
+import math
 import tifffile
 import array
+import glob
 import xml.etree.ElementTree as ET
 
 from imabeh.general.main import find_file

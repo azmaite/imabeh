@@ -38,7 +38,6 @@ def find_file(directory, name, file_type):
     
     return str(file_names[0])
 
-
 def find_sync_file(directory):
     """
     This function finds the path to the sync file "Episode001.h5" 
