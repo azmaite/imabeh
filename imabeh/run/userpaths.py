@@ -25,13 +25,13 @@ GLOBAL_PATHS = {
 }
 
 DEFAULT_PATHS = {
-    # paths to different folders within each trial (to append to each trial path)
-    "2p_path": "/2p",
-    "septacam_path": "/behData/images",
-    "fictrac_path": "/behData/fictrac",
-    "df3d_path": "/behData/df3d",
-    "processed_path": "/processed",
-    "figures_path": "/figures",
+    # relative paths to different folders within each trial (to append to each trial path)
+    "2p_path": "2p",
+    "septacam_path": "behData/images",
+    "fictrac_path": "behData/fictrac",
+    "df3d_path": "behData/df3d",
+    "processed_path": "processed",
+    "figures_path": "figures",
     
     # name of csv file to keep track of which fly folders have been processed
     "csv_fly_table": "_fly_processing_status.csv",
