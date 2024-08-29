@@ -3,9 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="imabeh",
     version="0.0.1",
-    packages=[
-        "imabeh", "imabeh.run"
-    ],
+    packages=find_packages(),
     author="Maite Azcorra",
     author_email="maite.azcorrasedano@epfl.ch",
 
