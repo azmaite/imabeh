@@ -11,7 +11,8 @@ from datetime import datetime
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 from imabeh.run.logmanager import LogManager
 
-from imabeh.imaging.main import create_tiffs
+from imabeh.imaging.utils2p import create_tiffs
+from imabeh.behavior.fictrac import config_and_run_fictrac
 
 
 class Task:
@@ -162,7 +163,9 @@ class TestTask2(Task):
     
 class TifTask(Task):
     """
-    Task to convert .raw files to .tif files
+    Task to convert .raw files to .tif files.
+    Will save the .tif files in the same directory as the .raw files,
+    named as stack.tif (1 channel) or stack_ch1.tif + stack_ch2.tif (two channels)
     """
     def __init__(self, prio=0):
         self.name = "tif"
@@ -170,8 +173,25 @@ class TifTask(Task):
 
     def _run(self, torun_dict):
         # convert raw to tiff
-        full_path = self.full_path(torun_dict)
-        create_tiffs(full_path)
+        create_tiffs(self.full_path(torun_dict))
+
+class FictracTask(Task):
+    """ 
+    Task to run fictrac to track the ball movement and save the results in the behaviour dataframe.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "fictrac"
+        self.prerequisites = []
+
+    def _run(self, torun_dict) -> bool:
+        config_and_run_fictrac(self.full_path(torun_dict))
+
+#         print("STARTING PREPROCESSING OF FLY: \n" + fly_dict["dir"])
+#         preprocess = PreProcessFly(fly_dir=fly_dict["dir"], params=self.params,
+#                                    trial_dirs=trial_dirs)
+#         preprocess.get_dfs()
 
 
 
@@ -185,7 +205,7 @@ class TifTask(Task):
 #         self.name = "name"
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
-#     def _run(self, trial_path) -> bool:
+#     def _run(self, torun_dict) -> bool:
 #         # enter functions to run here
 #         # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
         

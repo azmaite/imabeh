@@ -538,7 +538,7 @@ class TaskManager():
             ready_tasks = self.torun_table[self.torun_table['status'] == "ready"]
             # if none are ready, wait and check again
             if ready_tasks.empty:
-                print('Waiting...')
+                log.add_line_to_log('Waiting...')
                 time.sleep(self.t_wait_s)
 
             # otherwise, run the next ready task

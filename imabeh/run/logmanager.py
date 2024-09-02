@@ -15,7 +15,7 @@ The LogManager class contains the followingfunctions:
 import os
 import pandas as pd
 
-from imabeh.run.userpaths import LOCAL_DIR
+from imabeh.run.userpaths import LOCAL_DIR, user_config
 
 
 class LogManager():
@@ -68,7 +68,7 @@ class LogManager():
             log_date = pd.to_datetime(log_file[-19:-4], format='%Y%m%d_%H%M%S')
             
             # Delete if older than 14 days
-            if pd.Timestamp.now() - log_date > pd.Timedelta(days=14):
+            if pd.Timestamp.now() - log_date > pd.Timedelta(minutes=30):#(days=14): # for testing, delete logs older than 30 minutes - change to days=14 when ready!
                 os.remove(os.path.join(self.log_folder, log_file))
 
 
@@ -93,7 +93,7 @@ class LogManager():
         # create a new task log file
         log_file_path = os.path.join(self.log_folder, self.log_file)
         with open(log_file_path, "w") as file:
-            file.write(f"Task log created on {now}\n")
+            file.write(f"Log created by {user_config['initials']} on {now}\n")
             file.write('\n')
 
 
