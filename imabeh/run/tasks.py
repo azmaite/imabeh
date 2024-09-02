@@ -3,16 +3,35 @@
 """
 sub-module to define different steps of pre-processing as sub-classes of Task.
 List of all available tasks is defined in task_collection at the bottom (automatically generated).
+
+Each task should have the following methods:
+    __init__(self) : to define the task name and prerequisites
+    _run(self, torun_dict, log) : to run the task
+
+On top of this, the general Task class has the following methods:
+    start_run(self, torun_dict, log) : to start the running of the task, by:
+        - logging the start of the task in the general log
+        - logging that the task is running in the taskstatus log file
+        - calling the _run method of the task
+        - logging the end of the task in the taskstatus log file (whether successful or not)
+        - returning the path to the taskstatus log file
+    test_finished(self, torun_dict) : to check if the task has finished by reading 
+        the taskstatus log file (created by start_run method)
 """
+
+# general imports
 import os
 import time
 from datetime import datetime
 
+# imports for the task manager to run
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 from imabeh.run.logmanager import LogManager
+from imabeh.general.main import combine_df
 
+# task specific imports
 from imabeh.imaging.utils2p import create_tiffs
-from imabeh.behavior.fictrac import config_and_run_fictrac
+from imabeh.behavior.fictrac import config_and_run_fictrac, get_fictrac_df
 
 
 class Task:
@@ -65,7 +84,7 @@ class Task:
 
         try:
             # RUN TASK!!!
-            self._run(torun_dict)
+            self._run(torun_dict, log)
 
             # log the correct end of the task
             task_log.add_line_to_log("finished successfully at " + time.ctime(time.time()))
@@ -119,14 +138,13 @@ class Task:
             os.remove(task_log)
             return 1
         elif last_line.startswith("failed") or last_line.startswith("  Error"):
+            # don't delte log, might want to check!
             return 2
         elif last_line.startswith("running"):
             return 0
         # otherwise raise error
         else:
             raise ValueError("Taskstatus log file is corrupted or not in the correct format")
-
-
 
 
 ## ALL TASKS DEFINED BELOW
@@ -140,7 +158,7 @@ class TestTask1(Task):
         self.name = "test1"
         self.prerequisites = []
 
-    def _run(self, torun_dict) -> bool:
+    def _run(self, torun_dict, log) -> bool:
         # RUN TASK!!!
         print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
@@ -155,7 +173,7 @@ class TestTask2(Task):
         self.name = "test2"
         self.prerequisites = ['test1']
 
-    def _run(self, torun_dict) -> bool:
+    def _run(self, torun_dict, log) -> bool:
         # RUN TASK!!!
         print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
@@ -171,7 +189,7 @@ class TifTask(Task):
         self.name = "tif"
         self.prerequisites = []
 
-    def _run(self, torun_dict):
+    def _run(self, torun_dict, log):
         # convert raw to tiff
         create_tiffs(self.full_path(torun_dict))
 
@@ -185,13 +203,23 @@ class FictracTask(Task):
         self.name = "fictrac"
         self.prerequisites = []
 
-    def _run(self, torun_dict) -> bool:
-        config_and_run_fictrac(self.full_path(torun_dict))
+    def _run(self, torun_dict, log) -> bool:
+        # check if overwrite = True
+        # if so, show a warning (fictrac will make a new file, not really overwrite)
+        if torun_dict['overwrite']:
+            log.add_line_to_log("WARNING: Overwrite = True for fictrac task will be ignored, as fictrac will create a new file regardless.")
 
-#         print("STARTING PREPROCESSING OF FLY: \n" + fly_dict["dir"])
-#         preprocess = PreProcessFly(fly_dir=fly_dict["dir"], params=self.params,
-#                                    trial_dirs=trial_dirs)
-#         preprocess.get_dfs()
+        # run fictrac
+        config_and_run_fictrac(self.full_path(torun_dict))
+        # convert output to df and save it
+        fictract_df_path = get_fictrac_df(self.full_path(torun_dict))
+        print('fine')
+        # combine the fictrac df with the main df
+        print(self.full_path(torun_dict))
+        print(fictract_df_path)
+        combine_df(self.full_path(torun_dict), fictract_df_path, log)
+
+
 
 
 
@@ -205,7 +233,7 @@ class FictracTask(Task):
 #         self.name = "name"
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
-#     def _run(self, torun_dict) -> bool:
+#     def _run(self, torun_dict, log) -> bool:
 #         # enter functions to run here
 #         # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
         

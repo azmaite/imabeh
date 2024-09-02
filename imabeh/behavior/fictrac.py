@@ -1,8 +1,9 @@
 """
 sub-module to run and analyse fictrac.
+
 Includes functions to prepare the required config file and run ficrac in a new process.
 Includes functionality to read results from fictrac & combine them with an existing Pandas dataframe
-copied from NeLy-EPFL/twoppp/behavior/fictrac.py
+Copied and slightly modified from NeLy-EPFL/twoppp/behavior/fictrac.py
 
 Contains functions:
 
@@ -10,42 +11,38 @@ Contains functions:
 - config_and_run_fictrac()
 
 # ACCESSORY FUNCTIONS USED IN config_and_run_fictrac
-- get_mean_image()
-- get_ball_parameters()
-- get_circ_points_for_config()
-- write_config_file()
-- run_fictrac_config_gui()
-- run_fictrac()
+- _get_mean_image()
+- _get_ball_parameters()
+- _get_circ_points_for_config()
+- _write_config_file()
+- _run_fictrac_config_gui()
+- _run_fictrac()
 
 # FUNCTIONS TO READ FICTRAC OUTPUT
 - _get_septacam_fps()
-- get_v_th_from_fictrac()
-- filter_fictrac()
+- _filter_fictrac()
+- get_fictrac_df()
 """
 
 import os
-import sys
 import numpy as np
 import pandas as pd
 import cv2
 import json
-#from tqdm import tqdm
 import glob
-#from scipy.ndimage import gaussian_filter1d, median_filter
-from time import sleep
+from scipy.ndimage import gaussian_filter1d, median_filter
 
 from imabeh.run.userpaths import user_config, LOCAL_DIR
 from imabeh.behavior import behaviormain
 from imabeh.general import main
 
 
+# set ball radius in mm
+R_BALL = 5 
 
-
-# set ball radius 
-r_ball = 5
-
+# set column names to read fictrac output
 # see https://github.com/rjdmoore/fictrac/blob/master/doc/data_header.txt for fictrac output description
-col_names = ["Frame_counter",
+COL_NAMES = ["Frame_counter",
              "delta_rot_cam_right", "delta_rot_cam_down", "delta_rot_cam_forward",
              "delta_rot_error",
              "delta_rot_lab_side", "delta_rot_lab_forward", "delta_rot_lab_turn",
@@ -62,6 +59,9 @@ col_names = ["Frame_counter",
              "alt_time"
             ]
 
+# get camera number from user_config
+CAMERA_NUM = user_config['fictrac_cam']
+
 ## MAIN FUNCTION TO CONFIG AND RUN FICTRAC
 
 def config_and_run_fictrac(trial_dir):
@@ -74,8 +74,7 @@ def config_and_run_fictrac(trial_dir):
         absolute directory pointing to a trial directory.
     """
     # get video file name from user_config
-    camera_num = user_config['fictrac_cam']
-    video_file = main.find_file(trial_dir, f"camera_{camera_num}.mp4", file_type="video")
+    video_file = main.find_file(trial_dir, f"camera_{CAMERA_NUM}.mp4", file_type="video")
     # get the fictrac output directory from user_config and trial_dir
     output_dir = os.path.join(trial_dir, user_config['fictrac_path'])
     # check if dir already exists. If not, create it
@@ -87,31 +86,30 @@ def config_and_run_fictrac(trial_dir):
         FileNotFoundError(f"Could not find video file: {video_file}.")
 
     # get mean image, ball parameters, and create config file
-    mean_image = get_mean_image(video_file, output_dir=output_dir)
-    x_min, y_min, r_min = get_ball_parameters(mean_image, output_dir=output_dir)
-    points = get_circ_points_for_config(x_min, y_min, r_min, img_shape=mean_image.shape[:2])
-    config_file = write_config_file(video_file, output_dir, points, overwrite=False)
+    mean_image = _get_mean_image(video_file, output_dir=output_dir)
+    x_min, y_min, r_min = _get_ball_parameters(mean_image, output_dir=output_dir)
+    points = _get_circ_points_for_config(x_min, y_min, r_min, img_shape=mean_image.shape[:2])
+    config_file = _write_config_file(video_file, output_dir, points, overwrite=False)
     # run config gui
-    success = run_fictrac_config_gui(config_file)
+    success = _run_fictrac_config_gui(config_file)
     if not success:
         RuntimeError("Fictrac config gui failed.")
 
     # run fictrac and save output automatically
-    success = run_fictrac(config_file)
+    success = _run_fictrac(config_file)
     if not success:
         print('why') #FOR SOME REASON THIS WORKS BUT NOT THE ERROR BELOW!!!
         RuntimeError("Fictrac running failed.")
 
-    # move the output file to the output directory
-    _move_fictrac_output(video_file, camera_num, output_dir)
+    # move the output file to the output directory and delete fictrac log files
+    _move_fictrac_output(video_file, output_dir)
     
 
 
 ## ACCESSORY FUNCTIONS USED IN config_and_run_fictrac
 
-def get_mean_image(video_file, output_dir, skip_existing=True):
+def _get_mean_image(video_file, output_dir, skip_existing=True):
     """compute the mean image of a video and save it as a file.
-    slightly modified from NeLy-EPFL/twoppp/behavior/fictrac.py
 
     Parameters
     ----------
@@ -157,11 +155,10 @@ def get_mean_image(video_file, output_dir, skip_existing=True):
 
     return mean_frame
 
-def get_ball_parameters(img, output_dir=None):
+def _get_ball_parameters(img, output_dir=None):
     """Using an image that includes the ball, for example the mean image,
     compute the location and the radius of the ball.
     Uses cv2.HoughCircles to find circles in the image and then selects the most likely one.
-    slightly modified from NeLy-EPFL/twoppp/behavior/fictrac.py
 
     Parameters
     ----------
@@ -225,7 +222,7 @@ def get_ball_parameters(img, output_dir=None):
         # return ball location and radius
         return x_min, y_min, r_min
 
-def get_circ_points_for_config(x, y, r, img_shape, n=12):
+def _get_circ_points_for_config(x, y, r, img_shape, n=12):
     """convert circle parameters into individual points on the surface of the ball
     as if they were generated from the fictrac config gui
 
@@ -276,7 +273,7 @@ def _format_list(l):
     s = s.replace("]", " }")
     return s
 
-def write_config_file(video_file, output_dir, roi_circ, vfov=3.05, q_factor=40, c2a_src="c2a_cnrs_xz", do_display="n",
+def _write_config_file(video_file, output_dir, roi_circ, vfov=3.05, q_factor=40, c2a_src="c2a_cnrs_xz", do_display="n",
                       c2a_t=[-5.800291, -23.501165, 1762.927645], c2a_r=[1.200951, -1.196946, -1.213069],
                       c2a_cnrs_xz=[422, 0, 422, 0, 422, 10, 422, 10], overwrite=False, ignore_roi=None):
     """Create a config file for fictrac.
@@ -342,7 +339,7 @@ def write_config_file(video_file, output_dir, roi_circ, vfov=3.05, q_factor=40, 
 
     return config_file
 
-def run_fictrac_config_gui(config_file, fictrac_config_gui="~/bin/fictrac/bin/configGui"):
+def _run_fictrac_config_gui(config_file, fictrac_config_gui="~/bin/fictrac/bin/configGui"):
     """runs the fictrac config gui in a subprocess and sequentially sends "y\n" responses to continue.
     This is required because the config gui computes some parameters based on the inputs given.
 
@@ -364,7 +361,7 @@ def run_fictrac_config_gui(config_file, fictrac_config_gui="~/bin/fictrac/bin/co
 
     return success
 
-def run_fictrac(config_file, fictrac="~/bin/fictrac/bin/fictrac"):
+def _run_fictrac(config_file, fictrac="~/bin/fictrac/bin/fictrac"):
     """Runs fictrac in the current console using the subprocess module.
     The console will not be blocked, but the outputs will be printed regularily
 
@@ -382,12 +379,13 @@ def run_fictrac(config_file, fictrac="~/bin/fictrac/bin/fictrac"):
     """
     command = f"{fictrac} {config_file}"
     success = main.run_shell_command(command, allow_ctrl_c=True, suppress_output=False)
-
+    print(f"success = {success}")
     return success
 
-def _move_fictrac_output(video_file, camera_num, output_dir):
+def _move_fictrac_output(video_file, output_dir):
     """move the output of fictrac to the correct directory.
-    Automatically it gets saved in the video directory instead of the output dir
+    Automatically it gets saved in the video directory instead of the output dir.
+    Also removes the log files that fictrac creates.
 
     Parameters
     ----------
@@ -400,7 +398,7 @@ def _move_fictrac_output(video_file, camera_num, output_dir):
     video_dir = os.path.dirname(video_file)
 
     # find the output files' full names
-    camera = f"camera_{camera_num}"
+    camera = f"camera_{CAMERA_NUM}"
     output_files = []
     output_files.append(glob.glob(os.path.join(video_dir, camera + "*.dat"))[0])
     output_files.append(glob.glob(os.path.join(video_dir, camera + "-configImg.png"))[0])
@@ -411,198 +409,104 @@ def _move_fictrac_output(video_file, camera_num, output_dir):
         new_name = os.path.join(output_dir, os.path.basename(file))
         os.rename(file, new_name)
     
-    # remove fictrac log files
-    # two copies get saved, one in imabeh/run and another in the output directory
-    log_files_output = glob.glob(os.path.join(output_dir, "fictrac*.log"))
-    log_files_imabeh = glob.glob(os.path.join(LOCAL_DIR, "fictrac*.log"))
-    for file in log_files_output + log_files_imabeh:
+    # remove fictrac log files in imabeh/run
+    log_files = glob.glob(os.path.join(LOCAL_DIR, "fictrac*.log"))
+    for file in log_files:
         os.remove(file)
 
 
 ## FUNCTIONS TO READ FICTRAC OUTPUT
     
 def _get_septacam_fps(trial_dir):
-    """get the fps of the septacam from the metadata file"""
+    """get the fps of the septacam from the metadata file
+
+    Parameters
+    ----------
+    trial_dir : str
+        trial directory
+    
+    Returns
+    -------
+    f_s : int
+        frame rate of the septacam as given by the metadata file
+    """   
 
     cam_metadata_file = behaviormain.find_seven_camera_metadata_file(trial_dir)
     metadata = json.load(open(cam_metadata_file))
     f_s = metadata['FPS']
 
-# def get_v_th_from_fictrac(trial_dir, r_ball=r_ball):
-#     """extract the forward velocity and the orientation of the fly from the fictrac output
-#     see https://github.com/rjdmoore/fictrac/blob/master/doc/data_header.txt or col_names
-#     at top of script for fictrac output description
+    return f_s
 
-#     Parameters
-#     ----------
-#     trial_dir : string
-#         trial directory that contains the behData/images subfolder,
-#         which in turn holds the fictrac output
-#     r_ball : float, optional
-#         ball radius, by default r_ball (default defined at top of script)
+def _filter_fictrac(time_series, med_filt_size=5, sigma_gauss_size=10):
+    """apply Median filter and Gaussian filter to fictrac time series
 
-#     Returns
-#     -------
-#     numpy array
-#         vector of velocity across time
-#     numpy array
-#         vector of orientation across time
-#     """
-#     # get frame rate from meatatada
-#     f_s = _get_septacam_fps(trial_dir)
+    Parameters
+    ----------
+    time_series : numpy array
+        time series to filter
+    med_filt_size : int, optional
+        size of median filter, by default 5
+    sigma_gauss_size : int, optional
+        width of Gaussian kernel, by default 10
+
+    Returns
+    -------
+    numpy array
+        filtered time series
+    """
+    return gaussian_filter1d(median_filter(time_series, size=med_filt_size), sigma=sigma_gauss_size)
+
+def get_fictrac_df(trial_dir, med_filt_size=5, sigma_gauss_size=10):
+    """Read the output of fictrac, convert it into physical units and save it in a dataframe.
+
+    Parameters
+    ----------
+    trial_dir : str
+        trial directory
+    med_filt_size : int, optional
+        size of median filter applied to velocity and orientation, by default 5
+    sigma_gauss_size : int, optional
+        width of Gaussian kernel applied to velocity and orientation, by default 10
+
+    Returns
+    -------
+    fictact_df_path : str
+        path to the dataframe
+    """
+    # get septacam frame rate from meatatada
+    f_s = _get_septacam_fps(trial_dir)
+
+    # find the most recent fictrac output file
+    fictrac_output = behaviormain.find_fictrac_file(trial_dir, camera=CAMERA_NUM, most_recent=True)
+    # read the data
+    fictrac_df = pd.read_csv(fictrac_output, header=None, names=COL_NAMES)
     
-#     # get path to the fictrac output FROM USER_CONFIG
-#     fictrac_dir = os.path.join(trial_dir, user_config['fictrac_path'])
-#     fictrac_data_file = glob.glob(os.path.join(fictrac_dir, "camera*.dat"))[0]
-
-#     # col_names = np.arange(25) + 1
-#     df = pd.read_csv(fictrac_data_file, header=None, names=col_names)
-
-#     v_raw = df["animal_movement_speed"] * f_s  # df[19] * f_s  # convert from rad/frame to rad/s
-#     th_raw = df["animal_movement_direction_lab"]  # df[18]
-
-#     v = gaussian_filter1d(median_filter(v_raw, size=5), sigma=10) * r_ball  # rad/s == mm/s on ball with 1mm radius
-#     th = (gaussian_filter1d(median_filter(th_raw, size=5), sigma=10) - np.pi) / np.pi * 180
-#     return v, th
-
-
-# def filter_fictrac(x, med_filt_size=5, sigma_gauss_size=10):
-#     """apply Median filter and Gaussian filter to fictrac quantities
-
-#     Parameters
-#     ----------
-#     x : numpy array
-#         time series to filter
-
-#     med_filt_size : int, optional
-#         size of median filter, by default 5
-
-#     sigma_gauss_size : int, optional
-#         width of Gaussian kernel, by default 10
-
-#     Returns
-#     -------
-#     numpy array
-#         filtered time series
-#     """
-#     return gaussian_filter1d(median_filter(x, size=med_filt_size), sigma=sigma_gauss_size)
-
-
-
-
-# def get_fictrac_df(trial_dir, index_df=None, df_out_dir=None, med_filt_size=5, sigma_gauss_size=10):
-#     """Read the output of fictrac, convert it into physical units and save it in dataframe.
-#     If index_df is supplied, fictrac results will be added to this dataframe.
-
-#     Parameters
-#     ----------
-#     trial_dir : str
-#         trial directory
-
-#     index_df : pandas Dataframe or str, optional
-#         pandas dataframe or path of pickle containing dataframe to which the fictrac result is added.
-#         This could, for example, be a dataframe that contains indices for synchronisation with 2p data,
-#         by default None
-
-#     df_out_dir : str, optional
-#         if specified, will save the dataframe as .pkl, by default None
-
-#     med_filt_size : int, optional
-#         size of median filter applied to velocity and orientation, by default 5
-
-#     sigma_gauss_size : int, optional
-#         width of Gaussian kernel applied to velocity and orientation, by default 10
-
-#     Returns
-#     -------
-#     pandas DataFrame
-#         dataframe containing the output of fictrac
-
-#     Raises
-#     ------
-#     IOError
-#         If fictract output file cannot be located
-
-#     ValueError
-#         If the length of the specified index_df and the fictrac output do not match
-#     """
-#     # partially adapted from Florian: https://github.com/NeLy-EPFL/ABO_data_processing/blob/master/fictrac_sync_odor.py
-#     if isinstance(index_df, str) and os.path.isfile(index_df):
-#         index_df = pd.read_pickle(index_df)
-#     if index_df is not None:
-#         assert isinstance (index_df, pd.DataFrame)
-
-#     trial_image_dir = os.path.join(trial_dir, "behData", "images")
-
-#     possible_fictrac_dats = glob.glob(os.path.join(trial_image_dir, "camera*.dat"))
+    # convert time series to physical units (using framerate and ball radius)
+    fictrac_df["v_raw"] = fictrac_df["animal_movement_speed"] * f_s * R_BALL # convert from rad/frame to rad/s and mm/s
+    fictrac_df["th_raw"] = (fictrac_df["animal_movement_direction_lab"] - np.pi) / np.pi * 180
+    fictrac_df["x"] = fictrac_df["integrated_lab_x"] * R_BALL
+    fictrac_df["y"] = fictrac_df["integrated_lab_y"] * R_BALL
+    fictrac_df["integrated_forward_movement"] *=  R_BALL
+    fictrac_df["integrated_side_movement"] *=  R_BALL
+    fictrac_df["delta_rot_lab_side"] *= R_BALL * f_s
+    fictrac_df["delta_rot_lab_forward"] *= R_BALL * f_s
+    fictrac_df["delta_rot_lab_turn"] *= R_BALL * f_s / np.pi * 180
     
-#     if len(possible_fictrac_dats) == 0:
-#         raise IOError(f"No file camera*.dat in {trial_image_dir}.")
+    # filter velocity and orientation time series
+    fictrac_df["v"] = _filter_fictrac(fictrac_df["v_raw"], med_filt_size, sigma_gauss_size)
+    fictrac_df["th"] = _filter_fictrac(fictrac_df["th_raw"], med_filt_size, sigma_gauss_size)
+    fictrac_df["v_forw"] = _filter_fictrac(fictrac_df["delta_rot_lab_forward"], med_filt_size, sigma_gauss_size)
+    fictrac_df["v_side"] = _filter_fictrac(fictrac_df["delta_rot_lab_side"], med_filt_size, sigma_gauss_size)
+    fictrac_df["v_turn"] = _filter_fictrac(fictrac_df["delta_rot_lab_turn"], med_filt_size, sigma_gauss_size)
     
-#     change_times = [os.stat(path).st_mtime for path in possible_fictrac_dats]
-#     most_recent_fictrac_dat = possible_fictrac_dats[np.argmax(change_times)]
-
-#     # col_names = np.arange(25) + 1
-#     fictrac_df = pd.read_csv(most_recent_fictrac_dat, header=None, names=col_names)
-
-#     fictrac_df["v_raw"] = fictrac_df["animal_movement_speed"] * f_s * r_ball # convert from rad/frame to rad/s and mm/s
-#     fictrac_df["th_raw"] = (fictrac_df["animal_movement_direction_lab"] - np.pi) / np.pi * 180
-#     fictrac_df["x"] = fictrac_df["integrated_lab_x"] * r_ball
-#     fictrac_df["y"] = fictrac_df["integrated_lab_y"] * r_ball
-#     fictrac_df["integrated_forward_movement"] *=  r_ball
-#     fictrac_df["integrated_side_movement"] *=  r_ball
-#     fictrac_df["delta_rot_lab_side"] *= r_ball * f_s
-#     fictrac_df["delta_rot_lab_forward"] *= r_ball * f_s
-#     fictrac_df["delta_rot_lab_turn"] *= r_ball * f_s / np.pi * 180
-
-#     fictrac_df["v"] = filter_fictrac(fictrac_df["v_raw"], med_filt_size, sigma_gauss_size)
-#     fictrac_df["th"] = filter_fictrac(fictrac_df["th_raw"], med_filt_size, sigma_gauss_size)
-#     fictrac_df["v_forw"] = filter_fictrac(fictrac_df["delta_rot_lab_forward"], med_filt_size, sigma_gauss_size)
-#     fictrac_df["v_side"] = filter_fictrac(fictrac_df["delta_rot_lab_side"], med_filt_size, sigma_gauss_size)
-#     fictrac_df["v_turn"] = filter_fictrac(fictrac_df["delta_rot_lab_turn"], med_filt_size, sigma_gauss_size)
-
-#     fictrac_df = fictrac_df[["v_raw", "th_raw", "x", "y", "integrated_forward_movement",
-#                              "integrated_side_movement", "delta_rot_lab_side",
-#                              "delta_rot_lab_forward", "delta_rot_lab_turn", "v", "th",
-#                              "v_forw", "v_side", "v_turn"]]
-
-#     if index_df is not None:
-#         if len(index_df) != len(fictrac_df):
-#             if np.abs(len(index_df) - len(fictrac_df)) <=10:
-#                 Warning("Number of Thorsync ticks and length of fictrac file do not match. \n"+\
-#                         "Thorsync has {} ticks, fictrac file has {} lines. \n".format(len(index_df), len(fictrac_df))+\
-#                         "Trial: "+ trial_dir)
-#                 print("Difference: {}".format(len(index_df) - len(fictrac_df)))
-#                 length = np.minimum(len(index_df), len(fictrac_df))
-#                 index_df = index_df.iloc[:length, :]
-#                 fictrac_df = fictrac_df.iloc[:length, :]
-#             else:
-#                 raise ValueError("Number of Thorsync ticks and length of fictrac file do not match. \n"+\
-#                         "Thorsync has {} ticks, fictrac file has {} lines. \n".format(len(index_df), len(fictrac_df))+\
-#                         "Trial: "+ trial_dir)
-#         df = index_df
-#         for key in list(fictrac_df.keys()):
-#             df[key] = fictrac_df[key].values
-#     else:
-#         df = fictrac_df
-
-#     if df_out_dir is not None:
-#         df.to_pickle(df_out_dir)
-#     return df
-
-# # missing in automatically generated config file:
-# """
-# max_bad_frames   : -1
-# opt_bound        : 0.350000
-# opt_do_global    : n
-# opt_max_err      : -1.000000
-# opt_max_evals    : 50
-# opt_tol          : 0.001000
-# roi_c            : { -0.000151, 0.016618, 0.999862 } --> automatically generated by calling gui
-# roi_r            : 0.029995 --> automatically generated by calling gui
-# save_debug       : n
-# save_raw         : n
-# src_fps          : -1.000000
-# thr_ratio        : 1.250000
-# thr_win_pc       : 0.250000
-# """
+    # reorganize columns
+    fictrac_df = fictrac_df[["v_raw", "th_raw", "x", "y", "integrated_forward_movement",
+                             "integrated_side_movement", "delta_rot_lab_side",
+                             "delta_rot_lab_forward", "delta_rot_lab_turn", "v", "th",
+                             "v_forw", "v_side", "v_turn"]]
+    
+    # save the dataframe in the same folder as the fictrac output as a pickle file
+    df_out_dir = os.path.join(os.path.dirname(fictrac_output), "fictrac_df.pkl")
+    fictrac_df.to_pickle(df_out_dir)
+    
+    return df_out_dir
