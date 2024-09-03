@@ -227,8 +227,12 @@ class Df3dTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log):
+        trial_dir = self.full_path(torun_dict)
         try:
-            df3d.run_df3d(self.full_path(torun_dict), log)
+            df3d.run_df3d(trial_dir, log)
+            df3d.postprocess_df3d_trial(trial_dir)
+
+
         except Exception as e:
             log.add_line_to_log(f"Error running df3d: {e}")
             raise e

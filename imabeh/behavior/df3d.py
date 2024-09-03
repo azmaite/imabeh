@@ -1,24 +1,3 @@
-# df3d.prepare_for_df3d
-# df3d.run_df3d
-# df3d.postprocess_df3d_trial
-
-
-# tmp_dir = df3d.prepare_for_df3d(trial_dirs=trial_dirs,
-#                                 videos=self.params.behaviour_as_videos,
-#                                 scope=self.params.twop_scope,
-#                                 overwrite=self.params.overwrite
-#                                 )
-# df3d.run_df3d(tmp_dir)
-
-# df3d.postprocess_df3d_trial(trial_dir, overwrite=self.params.overwrite,
-#                             result_prefix=result_prefix)
-# df3d_out_dir = os.path.join(trial_dir, load.PROCESSED_FOLDER, self.params.df3d_df_out_dir)
-# if os.path.isfile(os.path.join(df3d_out_dir)):
-#     df3d.get_df3d_dataframe(trial_dir, index_df=df3d_out_dir, out_dir=df3d_out_dir, add_abdomen=True)
-
-
-
-
 """
 sub-module to run pose estimation usind df3d and read the output.
 
@@ -32,14 +11,14 @@ import pickle
 import numpy as np
 import pandas as pd
 
+from df3dPostProcessing.df3dPostProcessing import df3dPostProcess, df3d_skeleton
+
 # IMPORT ALL PATHS FROM USERPATHS - DO NOT add any paths outside of this import 
 from imabeh.run.userpaths import user_config, LOCAL_DIR
 
 from imabeh.run.logmanager import LogManager
 from imabeh.general.main import find_file
 
-
-#from df3dPostProcessing.df3dPostProcessing import df3dPostProcess, df3d_skeleton
 
 #FILE_PATH = os.path.realpath(__file__)
 #BEHAVIOUR_PATH, _ = os.path.split(FILE_PATH)
@@ -60,25 +39,26 @@ def run_df3d(trial_dir : str, log : LogManager):
         log manager object to log the task status
     """
 
-    # Get the output_dir, df3d_env and camera_ids from user_config
+    # Get the output_dir and camera_ids from user_config
     output_dir = user_config["df3d_path"]
-    df3d_env = user_config["df3d_env"]
     camera_ids = user_config["camera_order"]
+    # for the df3d folder, df3d-cli will automatically add /df3d to the end of the output_dir, so we need to remove it
+    if not output_dir.endswith("/df3d"):
+        raise ValueError("df3d output directory must end in '/df3d'")
+    output_dir = output_dir.rstrip("/df3d")
 
     # go to imabeh/behavior folder to run script
     behavior_dir = os.path.join(os.path.dirname(LOCAL_DIR), 'behavior')
     os.chdir(behavior_dir)
-    print(f"Current working directory: {os.getcwd()}")
 
-    # Run the shell script with these variables as arguments
-    # and read the exit code (0=success,1=env not found, 2=other issue)
+    # Run the shell script with these variables as arguments and read the exit code
     camera_ids_str = ' '.join(map(str, camera_ids))
-    error = os.system(f"bash ./run_df3d.sh {trial_dir} {output_dir} {df3d_env} \"{camera_ids_str}\"")
+    error = os.system(f"bash ./run_df3d.sh {trial_dir} {output_dir} \"{camera_ids_str}\"")
     error = error >> 8 # os.system returns the exit code as a 16-bit number, so we shift it to get the actual exit code
 
-    # log the error status(0=success,1=missing inputs, 2=df3d env not found, 3=df3d-cli failed)
+    # log the error status(0=success,1=missing inputs, 2=df3d-cli failed)
     if error != 0:
-        log.add_line_to_log(f"Error {error} while running df3d-cli (1=missing inputs, 2=df3d env not found, 3=df3d-cli failed)")
+        log.add_line_to_log(f"Error {error} while running df3d-cli (1=missing inputs, 2=df3d-cli failed)")
         raise RuntimeError(f"Error running df3d-cli - error: {error}")
 
 def find_df3d_file(directory, most_recent=False):
@@ -106,7 +86,7 @@ def find_df3d_file(directory, most_recent=False):
                       "df3d output",
                       most_recent=most_recent)
 
-def postprocess_df3d_trial(trial_dir, overwrite=False, result_prefix=""):
+def postprocess_df3d_trial(trial_dir):
     """run post-processing of deepfly3d data as defined in the df3dPostProcessing package:
     Align with reference fly template and calculate leg angles.
 
@@ -114,62 +94,25 @@ def postprocess_df3d_trial(trial_dir, overwrite=False, result_prefix=""):
     ----------
     trial_dir : string
         directory of the trial. should contain an "images" folder at some level of hierarchy
- 
-    overwrite : bool, optional
-        whether to overwrite existing results, by default False
-    
-    result_prefix: str, optional
-        will pre-pend a string to the output files, by default ""
     """
-    images_dir = os.path.join(trial_dir, "images")
-    if not os.path.isdir(images_dir):
-        images_dir = os.path.join(trial_dir, "behData", "images")
-        if not os.path.isdir(images_dir):
-            images_dir = find_file(trial_dir, "images", "images folder")
-            if not os.path.isdir(images_dir):
-                raise FileNotFoundError("Could not find 'images' folder.")
-    df3d_dir = os.path.join(images_dir, "df3d")
-    if not os.path.isdir(images_dir):
-        df3d_dir = find_file(images_dir, "df3d", "df3d folder")
-        if not os.path.isdir(images_dir):
-            raise FileNotFoundError("Could not find 'df3d' folder.")
-    try:
-        pose_result = find_file(df3d_dir, name="df3d_result*", file_type="df3d result file")
-        pose_result_name = "df3d_result"
-    except:
-        print("It seems like you are using an old version of DeepFly3D. Will seach for 'pose_result' file instead of 'df3d_result'")
-        pose_result = find_file(df3d_dir, name="pose_result*", file_type="pose result file")
-        pose_result_name = "pose_result"
-    if overwrite or not len(glob.glob(os.path.join(images_dir, "df3d", result_prefix+"joint_angles*"))):
-        try:
-            mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True,
-                                                outlier_correction=True)
-        except:
-            print("Dec. 2022 version of df3d post processing did not work. Will try keywords for older version")
-            try:
-                mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True,
-                                                    correct_outliers=True)
-            except:
-                print("New version of df3d post processing did not work. Will not correct outliers")
-                mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True)
-        try:
-            aligned_model = mydf3dPostProcess.align_to_template(interpolate=False, scale=True,
-                                                                all_body=True)
-        except:
-            print("New version of df3d post processing did not work.",
-                  "Will not align antennal markers")
-            aligned_model = mydf3dPostProcess.align_to_template(scale=True)
-        path = pose_result.replace(pose_result_name,result_prefix+'aligned_pose')
-        with open(path, 'wb') as f:
-            pickle.dump(aligned_model, f)
-        try: 
-            leg_angles = mydf3dPostProcess.calculate_leg_angles(save_angles=False)
-        except TypeError:
-            print("Using old version of df3d post processing!")
-            leg_angles = mydf3dPostProcess.calculate_leg_angles()
-        path = pose_result.replace(pose_result_name, result_prefix+'joint_angles')
-        with open(path, 'wb') as f:
-            pickle.dump(leg_angles, f)
+    # get the path to the df3d result file
+    pose_result = find_df3d_file(trial_dir)
+    pose_result_name = "df3d_result"
+
+    # run df3d post-processing
+    mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True, outlier_correction=True)
+    
+    # align model and save
+    aligned_model = mydf3dPostProcess.align_to_template(interpolate=False, scale=True, all_body=True)
+    path = pose_result.replace(pose_result_name,'aligned_pose')
+    with open(path, 'wb') as f:
+        pickle.dump(aligned_model, f)
+
+    # calculate leg angles and save
+    leg_angles = mydf3dPostProcess.calculate_leg_angles(save_angles=False)
+    path = pose_result.replace(pose_result_name, 'joint_angles')
+    with open(path, 'wb') as f:
+        pickle.dump(leg_angles, f)
 
 
 # def get_df3d_dataframe(trial_dir, index_df=None, out_dir=None, add_abdomen=True):

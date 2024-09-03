@@ -29,13 +29,12 @@ DEFAULT_PATHS = {
     "2p_path": "2p",
     "septacam_path": "behData/images",
     "fictrac_path": "behData/fictrac",
-    "df3d_path": "behData", # df3d will create a folder within this folder called /df3d
+    "df3d_path": "behData/df3d", # MUST END in /df3d! Otherwise, df3d-cli won't work
     "processed_path": "processed",
     "figures_path": "figures",
 
     # environment names for different processing steps
     "sleap_env": "sleap",
-    "df3d_env": "df3d",
     
     # name of csv file to keep track of which fly folders have been processed
     "csv_fly_table": "_fly_processing_status.csv",
@@ -57,7 +56,6 @@ SCOPE_CONFIG = {
         "camera_order": [6, 5, 4, 3, 2, 1, 0],
         "fictrac_cam": 3,
         "opto_cam": 5,
-        "df3d_env": "twoppp"   ################################## TODO: remove to use default when create new env
     },
     "scape": {
         "camera_order": [6, 5, 4, 3, 2, 1, 0],   ################################## TODO: check this
