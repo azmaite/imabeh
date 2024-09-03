@@ -30,8 +30,9 @@ from imabeh.run.logmanager import LogManager
 from imabeh.general.main import combine_df
 
 # task specific imports
-from imabeh.imaging.utils2p import create_tiffs
-from imabeh.behavior.fictrac import config_and_run_fictrac, get_fictrac_df
+from imabeh.imaging import utils2p
+from imabeh.behavior import fictrac
+from imabeh.behavior import df3d
 
 
 class Task:
@@ -97,13 +98,11 @@ class Task:
         # return the path to the taskstatus log file
         return os.path.join(task_log.log_folder,task_log.log_file)
 
-
-    def _run(self, torun_dict) -> bool:
+    def _run(self, torun_dict):
         """
         abstract method to be re-used in each Task subclass to actually run the task
         """
         raise NotImplementedError("This method should be implemented in the subclass")
-    
 
     def test_finished(self, torun_dict: dict) -> int:
         """
@@ -158,7 +157,7 @@ class TestTask1(Task):
         self.name = "test1"
         self.prerequisites = []
 
-    def _run(self, torun_dict, log) -> bool:
+    def _run(self, torun_dict, log):
         # RUN TASK!!!
         print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
@@ -173,7 +172,7 @@ class TestTask2(Task):
         self.name = "test2"
         self.prerequisites = ['test1']
 
-    def _run(self, torun_dict, log) -> bool:
+    def _run(self, torun_dict, log):
         # RUN TASK!!!
         print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
@@ -191,11 +190,11 @@ class TifTask(Task):
 
     def _run(self, torun_dict, log):
         # convert raw to tiff
-        create_tiffs(self.full_path(torun_dict))
+        utils2p.create_tiffs(self.full_path(torun_dict))
 
 class FictracTask(Task):
     """ 
-    Task to run fictrac to track the ball movement and save the results in the behaviour dataframe.
+    Task to run fictrac to track the ball movement and save the results in the main processed dataframe.
     """
 
     def __init__(self):
@@ -203,28 +202,44 @@ class FictracTask(Task):
         self.name = "fictrac"
         self.prerequisites = []
 
-    def _run(self, torun_dict, log) -> bool:
+    def _run(self, torun_dict, log):
         # check if overwrite = True
         # if so, show a warning (fictrac will make a new file, not really overwrite)
         if torun_dict['overwrite']:
             log.add_line_to_log("WARNING: Overwrite = True for fictrac task will be ignored, as fictrac will create a new file regardless.")
 
         # run fictrac
-        config_and_run_fictrac(self.full_path(torun_dict))
+        fictrac.config_and_run_fictrac(self.full_path(torun_dict))
         # convert output to df and save it
-        fictract_df_path = get_fictrac_df(self.full_path(torun_dict))
-        print('fine')
-        # combine the fictrac df with the main df
-        print(self.full_path(torun_dict))
-        print(fictract_df_path)
+        fictract_df_path = fictrac.get_fictrac_df(self.full_path(torun_dict))
+        # combine the fictrac df with the main processed df
         combine_df(self.full_path(torun_dict), fictract_df_path, log)
 
+class Df3dTask(Task):
+    """ 
+    Task to run pose estimation using DeepFly3D and Df3d post processing
+    and save results in behaviour dataframe.
+    """
 
+    def __init__(self):
+        super().__init__()
+        self.name = "df3d"
+        self.prerequisites = []
+
+    def _run(self, torun_dict, log):
+        try:
+            df3d.run_df3d(self.full_path(torun_dict), log)
+        except Exception as e:
+            log.add_line_to_log(f"Error running df3d: {e}")
+            raise e
+
+    
+        
 
 
 
 # # TEMPLATE FOR NEW TASKS
-# class TaskName(Task):
+# class NameTask(Task):
 #     """ Enter task description here.
 #     """
 
@@ -233,7 +248,7 @@ class FictracTask(Task):
 #         self.name = "name"
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
-#     def _run(self, torun_dict, log) -> bool:
+#     def _run(self, torun_dict, log):
 #         # enter functions to run here
 #         # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
         
@@ -245,4 +260,4 @@ class FictracTask(Task):
 
 ## Create the task_collection dictionary automatically
 # dict format: {task_name: TaskClass}
-task_collection = {cls().name: cls for cls in Task.__subclasses__()}
+task_collection = {cls().name: cls for cls in Task.__subclasses__()}#

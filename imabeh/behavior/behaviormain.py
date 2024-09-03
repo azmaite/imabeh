@@ -5,8 +5,6 @@ FUNCTIONS TO FIND BEHAVIOR SPECIFIC FILES
     - find_seven_camera_metadata_file
     - find_fictrac_file
 
-FUNCTIONS TO LOAD DATA OR METADATA
-    - 
 """
 
 import numpy as np

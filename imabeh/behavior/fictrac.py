@@ -32,9 +32,11 @@ import json
 import glob
 from scipy.ndimage import gaussian_filter1d, median_filter
 
-from imabeh.run.userpaths import user_config, LOCAL_DIR
 from imabeh.behavior import behaviormain
 from imabeh.general import main
+
+# IMPORT ALL PATHS FROM USERPATHS - DO NOT add any paths outside of this import 
+from imabeh.run.userpaths import user_config, LOCAL_DIR
 
 
 # set ball radius in mm
