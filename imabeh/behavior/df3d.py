@@ -5,12 +5,14 @@ Includes functions to prepare a run-script for DeepFly3D,
 run said script and perform post-processing with df3dPostProcessing.
 """
 import os
-from shutil import copy
-import glob
 import pickle
 import numpy as np
 import pandas as pd
+import sys
 
+# IMPORT FUNCTIONS FROM df3d (deepfly3d package) and df3dPostProcessing
+
+from df3d.cli import main as df3dcli
 from df3dPostProcessing.df3dPostProcessing import df3dPostProcess, df3d_skeleton
 
 # IMPORT ALL PATHS FROM USERPATHS - DO NOT add any paths outside of this import 
@@ -21,38 +23,35 @@ from imabeh.general.main import find_file
 
 
 def run_df3d(trial_dir : str, log : LogManager):
-    """run deepfly3d shell commands using os.system()
+    """run deepfly3d
 
     Parameters
     ----------
     trial_dir : str
-        directory of the trial. should contain an "images" folder at some level of hierarchy
-        df3d will be saved within this folder as specified in the user_config
+        directory of the trial. should contain "behData/images" folder
+        df3d will be saved within this trial folder as specified in the user_config
     log: LogManager
         log manager object to log the task status
     """
 
-    # Get the output_dir and camera_ids from user_config
+    # Get the output_dir and camera_ids from user_config as well as the images_dir
     output_dir = user_config["df3d_path"]
     camera_ids = user_config["camera_order"]
-    # for the df3d folder, df3d-cli will automatically add /df3d to the end of the output_dir, so we need to remove it
-    if not output_dir.endswith("/df3d"):
-        raise ValueError("df3d output directory must end in '/df3d'")
-    output_dir = output_dir.rstrip("/df3d")
+    images_dir = os.path.join(trial_dir, "behData", "images")
 
-    # go to imabeh/behavior folder to run script
-    behavior_dir = os.path.join(os.path.dirname(LOCAL_DIR), 'behavior')
-    os.chdir(behavior_dir)
+    # Simulate the command-line arguments
+    sys.argv = [
+        "df3d-cli",         # The name of the command
+        "-vv",              
+        "-o", images_dir,  
+        "--output-folder", output_dir,
+        "--order", *map(str, camera_ids)
+    ]
+    # Call the df3d main function to run
+    # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
+    # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
+    df3dcli()
 
-    # Run the shell script with these variables as arguments and read the exit code
-    camera_ids_str = ' '.join(map(str, camera_ids))
-    error = os.system(f"bash ./df3d_run.sh {trial_dir} {output_dir} \"{camera_ids_str}\"")
-    error = error >> 8 # os.system returns the exit code as a 16-bit number, so we shift it to get the actual exit code
-
-    # log the error status(0=success,1=missing inputs, 2=df3d-cli failed)
-    if error != 0:
-        log.add_line_to_log(f"Error {error} while running df3d-cli (1=missing inputs, 2=df3d-cli failed)")
-        raise RuntimeError(f"Error running df3d-cli - error: {error}")
 
 def find_df3d_file(directory, type : str = 'result', most_recent=False):
     """
