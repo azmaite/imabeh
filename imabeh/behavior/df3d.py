@@ -20,13 +20,6 @@ from imabeh.run.logmanager import LogManager
 from imabeh.general.main import find_file
 
 
-#FILE_PATH = os.path.realpath(__file__)
-#BEHAVIOUR_PATH, _ = os.path.split(FILE_PATH)
-
-#from twoppp.utils import makedirs_safe, find_file
-#from twoppp import TMP_PATH
-
-
 def run_df3d(trial_dir : str, log : LogManager):
     """run deepfly3d shell commands using os.system()
 
@@ -53,7 +46,7 @@ def run_df3d(trial_dir : str, log : LogManager):
 
     # Run the shell script with these variables as arguments and read the exit code
     camera_ids_str = ' '.join(map(str, camera_ids))
-    error = os.system(f"bash ./run_df3d.sh {trial_dir} {output_dir} \"{camera_ids_str}\"")
+    error = os.system(f"bash ./df3d_run.sh {trial_dir} {output_dir} \"{camera_ids_str}\"")
     error = error >> 8 # os.system returns the exit code as a 16-bit number, so we shift it to get the actual exit code
 
     # log the error status(0=success,1=missing inputs, 2=df3d-cli failed)
@@ -61,9 +54,10 @@ def run_df3d(trial_dir : str, log : LogManager):
         log.add_line_to_log(f"Error {error} while running df3d-cli (1=missing inputs, 2=df3d-cli failed)")
         raise RuntimeError(f"Error running df3d-cli - error: {error}")
 
-def find_df3d_file(directory, most_recent=False):
+def find_df3d_file(directory, type : str = 'result', most_recent=False):
     """
-    This function finds the path to the output file of df3d of the form `df3d_result*.pkl`, 
+    This function finds the path to the output files of df3d.
+    Can look for 'result' = (`df3d_result*.pkl`), 'angles' = (`joint_angles*.pkl`) or 'aligned' = (`aligned_pose*.pkl`)
     where `{cam}` is the values specified in the `camera` argument. 
     If multiple files with this name are found and most_recent = False, it throws an exception.
     otherwise, it returns the most recent file.
@@ -72,6 +66,8 @@ def find_df3d_file(directory, most_recent=False):
     ----------
     directory : str
         Directory in which to search.
+    type : str
+        Type of file to search for. Can be 'result', 'angles' or 'aligned'.
     most_recent : bool
         if True, returns the most recent file if multiple are found, by default False
 
@@ -81,9 +77,15 @@ def find_df3d_file(directory, most_recent=False):
         Path to df3d output file.
 
     """
+    search_type = {'result': 'df3d_result_*.pkl', 'angles': 'joint_angles_*.pkl', 'aligned': 'aligned_pose_*.pkl'}
+    # check that the type is correct
+    if type not in search_type.keys():
+        raise ValueError(f"Type must be one of {list(search_type.keys())}")
+    
+    # find file
     return find_file(directory,
-                      f"df3d_result_*.pkl",
-                      "df3d output",
+                      search_type[type],
+                      "df3d output " + type,
                       most_recent=most_recent)
 
 def postprocess_df3d_trial(trial_dir):
@@ -95,8 +97,8 @@ def postprocess_df3d_trial(trial_dir):
     trial_dir : string
         directory of the trial. should contain an "images" folder at some level of hierarchy
     """
-    # get the path to the df3d result file
-    pose_result = find_df3d_file(trial_dir)
+    # get the path to the (most recent) df3d result file
+    pose_result = find_df3d_file(trial_dir, 'result', most_recent=True)
     pose_result_name = "df3d_result"
 
     # run df3d post-processing
@@ -114,155 +116,80 @@ def postprocess_df3d_trial(trial_dir):
     with open(path, 'wb') as f:
         pickle.dump(leg_angles, f)
 
+def get_df3d_df(trial_dir):
+    """load pose estimation data into a dataframe.
+    Adds columns for joint position and joint angles in the final format
+    (one column per leg joint angle/position)
 
-# def get_df3d_dataframe(trial_dir, index_df=None, out_dir=None, add_abdomen=True):
-    # """load pose estimation data into a dataframe, potentially one that is synchronised
-    # to the two-photon recordings.
-    # Adds columns for joint position and joint angles.
+    Parameters
+    ----------
+    trial_dir : str
+        base directory where pose estimation results can be found
 
-    # Parameters
-    # ----------
-    # trial_dir : str
-    #     base directory where pose estimation results can be found
+    Returns
+    -------
+    beh_df_path: str
+        Path to df3d dataframe containing pose estimation data
+    """
+    # get the path to the most recent df3d result file as well as aligned and angles files
+    df3d_result = find_df3d_file(trial_dir, 'result', most_recent=True)
+    df3d_angles = find_df3d_file(trial_dir, 'angles', most_recent=True)
+    df3d_aligned = find_df3d_file(trial_dir, 'aligned', most_recent=True)
 
-    # index_df : pandas Dataframe or str, optional
-    #     pandas dataframe or path of pickle containing dataframe to which the df3d result is added.
-    #     This could, for example, be a dataframe that contains indices for synching with 2p data,
-    #     by default None
+    # read the angles and joit positions and convert naming to final format
+    # currently one dictionary per leg/region with subdictionary for each angle/position
+    # new format: one dictionary per leg/region and angle/position
 
-    # out_dir : str, optional
-    #     if specified, will save the dataframe as .pkl, by default None
+    # make empty dictionary to store data
+    df3d_dict = {}
 
-    # add_abdomen: bool, optional
-    #     if specified, search for abdominal markers in raw pose results
+    # read angles file
+    with open(df3d_angles, "rb") as f:
+        angles = pickle.load(f)
+    # get leg and angle keys
+    leg_keys = [key for key in angles.keys()]
+    angle_keys = [key for key in angles[leg_keys[0]].keys()]
+    # add joint angles with proper names and number format to df3d_dict
+    for leg in leg_keys:
+        if leg == "Head": # skip head, empty (no angles)
+            continue
+        for angle in angle_keys:
+            new_name = "angle_" + leg + "_" + angle
+            new_vals = np.array(angles[leg][angle])
+            df3d_dict[new_name] = new_vals
 
-    # Returns
-    # -------
-    # beh_df: pandas DataFrame
-    #     Dataframe containing behavioural data
-    # """
+    # read the joint position file
+    with open(df3d_aligned, "rb") as f:
+        joints = pickle.load(f)
+    # get leg keys
+    leg_keys = [key for key in joints.keys()]
+    # add positions proper names and number format to df3d_dict
+    # for each joint, iterate through x,y,z too
+    for leg in leg_keys:
+        joint_keys = [key for key in joints[leg].keys()]
+        for joint, (i_xyz, xyz) in zip(joint_keys, enumerate(["x", "y", "z"])):
+            new_name = "joint" + leg + "_" + joint + "_" + xyz
+            new_vals = np.array(joints[leg][joint]["raw_pos_aligned"][:, i_xyz])
+            df3d_dict[new_name] = new_vals
 
-    # if index_df is not None and isinstance(index_df, str) and os.path.isfile(index_df):
-    #     index_df = pd.read_pickle(index_df)
-    # if index_df is not None:
-    #     assert isinstance(index_df, pd.DataFrame)
-    # beh_df = index_df
+    # get the abdomen positions from df3d result file
+    with open(df3d_result, "rb") as f:
+        pose = pickle.load(f)
+    # get abdomen indeces from df3d_skeleton
+    abdomen_keys = ["RStripe1", "RStripe2", "RStripe3", "LStripe1", "LStripe2", "LStripe3"]
+    abdomen_inds = [df3d_skeleton.index(key) for key in abdomen_keys]
+    # add abdomen positions with proper names and number format to df3d_dict
+    for i_abd, abd_key, (i_xyz, xyz) in zip(abdomen_inds, abdomen_keys, enumerate(["x", "y", "z"])):
+        new_name = "joint_Abd_" + abd_key + "_" + xyz
+        new_vals = np.array(pose["points3d"][:, i_abd, i_xyz])
+        df3d_dict[new_name] = new_vals
 
-    # images_dir = os.path.join(trial_dir, "images")
-    # if not os.path.isdir(images_dir):
-    #     images_dir = os.path.join(trial_dir, "behData", "images")
-    #     if not os.path.isdir(images_dir):
-    #         images_dir = find_file(trial_dir, "images", "images folder")
-    #         if not os.path.isdir(images_dir):
-    #             raise FileNotFoundError("Could not find 'images' folder.")
-    # df3d_dir = os.path.join(images_dir, "df3d")
-    # if not os.path.isdir(images_dir):
-    #     df3d_dir = find_file(images_dir, "df3d", "df3d folder")
-    #     if not os.path.isdir(images_dir):
-    #         raise FileNotFoundError("Could not find 'df3d' folder.")
+    # create a dataframe with all the data
+    df3d_df = pd.DataFrame(df3d_dict)
 
-    # # read the angles and convert them into an understandable format
-    # angles_file = find_file(df3d_dir, name="joint_angles*", file_type="joint angles file")
-    # with open(angles_file, "rb") as f:
-    #     angles = pickle.load(f)
-    # leg_keys = []
-    # _ = [leg_keys.append(key) for key in angles.keys()]
-    # angle_keys = []
-    # _ = [angle_keys.append(key) for key in angles[leg_keys[0]].keys()]
-
-    # if "Head" in leg_keys:
-    #     N_features = (len(leg_keys) - 1) * len(angle_keys)
-    # else:
-    #     N_features = len(leg_keys) * len(angle_keys)
-
-    # N_samples = len(angles[leg_keys[0]][angle_keys[0]])
-    # X = np.zeros((N_samples, N_features), dtype="float64")
-    # X_names = []
-    # for i_leg, leg in enumerate(leg_keys):
-    #     if leg == "Head":
-    #         continue
-    #     for i_angle, angle in enumerate(angle_keys):
-    #         X[:, i_angle + i_leg*len(angle_keys)] = np.array(angles[leg][angle])
-    #         X_names.append("angle_" + leg + "_" + angle)
-
-    # # read the joints from df3d after post-processing and convert them into an understandable format
-    # joints_file = find_file(df3d_dir, name="aligned_pose*", file_type="aligned pose file")
-    # with open(joints_file, "rb") as f:
-    #     joints = pickle.load(f)
-    # leg_keys = list(joints.keys())
-    # joint_keys = list(joints[leg_keys[0]].keys())
-    # if "Head" in leg_keys:
-    #     head_keys = list(joints["Head"].keys())
-    #     N_features = (len(leg_keys) - 1) * len(joint_keys) + len(head_keys)
-    # else:
-    #     head_keys = []
-    #     N_features = len(leg_keys) * len(joint_keys)
-    # Y = np.zeros((N_samples, N_features*3), dtype="float64")
-    # Y_names = []
-    # for i_leg, leg in enumerate(leg_keys):
-    #     if leg == "Head":
-    #         continue
-    #     for i_joint, joint in enumerate(joint_keys):
-    #         Y[:, i_leg*len(joint_keys)*3 + i_joint*3 : i_leg*len(joint_keys)*3 + (i_joint+1)*3] = \
-    #             np.array(joints[leg][joint]["raw_pos_aligned"])
-    #         Y_names += ["joint_" + leg + "_" + joint + i_ax for i_ax in ["_x", "_y", "_z"]]
-    # if "Head" in leg_keys:
-    #     N_legs = len(leg_keys) - 1
-    #     for i_key, head_key in enumerate(head_keys):
-    #         Y[:, N_legs*len(joint_keys)*3 + i_key*3 : N_legs*len(joint_keys)*3 + (i_key+1)*3] = \
-    #                 np.array(joints["Head"][head_key]["raw_pos_aligned"])
-    #         Y_names += ["joint_Head_" + head_key + i_ax for i_ax in ["_x", "_y", "_z"]]
-
-    # if add_abdomen:
-    #     try:
-    #         pose_file = find_file(df3d_dir, name="df3d_result*", file_type="df3d result file")
-    #     except:
-    #         print("It seems like you are using an old version of DeepFly3D. Will seach for 'pose_result' file instead of 'df3d_result'")
-    #         pose_file = find_file(df3d_dir, name="pose_result*", file_type="pose result file")
-    #     with open(pose_file, "rb") as f:
-    #         pose = pickle.load(f)
-    #     abdomen_keys = ["RStripe1", "RStripe2", "RStripe3", "LStripe1", "LStripe2", "LStripe3"]
-    #     abdomen_inds = [df3d_skeleton.index(key) for key in abdomen_keys]
-
-    #     N_features = len(abdomen_keys)
-    #     Z = np.zeros((N_samples, N_features*3), dtype="float64")
-    #     Z_names = []
-    #     for i_key, (i_abd, abd_key) in enumerate(zip(abdomen_inds, abdomen_keys)):
-    #         Z[:, i_key*3:(i_key+1)*3] = pose["points3d"][:,i_abd, :]
-    #         Z_names += ["joint_Abd_" + abd_key + i_ax for i_ax in ["_x", "_y", "_z"]]
-
-    # if beh_df is None:
-    #     # if no index_df was supplied externally,
-    #     # try to get info from trial directory and create empty dataframe
-    #     frames = np.arange(N_samples)
-    #     try:
-    #         fly_dir, trial = os.path.split(trial_dir)
-    #         date_dir, fly = os.path.split(fly_dir)
-    #         _, date_genotype = os.path.split(date_dir)
-    #         date = int(date_genotype[:6])
-    #         genotype = date_genotype[7:]
-    #         fly = int(fly[3:])
-    #         i_trial = int(trial[-3:])
-    #     except:
-    #         date = 123456
-    #         genotype = ""
-    #         fly = -1
-    #         i_trial = -1
-    #     indices = pd.MultiIndex.from_arrays(([date, ] * N_samples,  # e.g 210301
-    #                                             [genotype, ] * N_samples,  # e.g. 'J1xCI9'
-    #                                             [fly, ] * N_samples,  # e.g. 1
-    #                                             [i_trial, ] * N_samples,  # e.g. 1
-    #                                             frames
-    #                                         ),
-    #                                         names=[u'Date', u'Genotype', u'Fly', u'Trial',u'Frame'])
-    #     beh_df = pd.DataFrame(index=indices)
-
-    # beh_df[X_names] = X
-    # beh_df[Y_names] = Y
-    # if add_abdomen:
-    #     beh_df[Z_names] = Z
-
-    # if out_dir is not None:
-    #     beh_df.to_pickle(out_dir)
-
-    # return beh_df
+    # save the dataframe in the same folder as the df3d results as a pickle file
+    df_out_dir = os.path.join(os.path.dirname(df3d_result), "df3d_df.pkl")
+    print(df_out_dir)
+    df3d_df.to_pickle(df_out_dir)
+    
+    return df_out_dir

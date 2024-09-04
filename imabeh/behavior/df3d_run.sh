@@ -37,7 +37,7 @@ do
     mkdir -p "$output_path"
     
     # Run df3d-cli and check if successful
-    if ! CUDA_VISIBLE_DEVICES=0 df3d-cli -vv -o "$images_folder" --output-folder "$output_path" -order $camera_ids 2>&1; then
+    if ! CUDA_VISIBLE_DEVICES=0 df3d-cli -vv -o "$images_folder" --output-folder "$output_path" --order $camera_ids 2>&1; then
         echo "df3d-cli command failed for trial: $trial_dir"
         exit 2
     fi

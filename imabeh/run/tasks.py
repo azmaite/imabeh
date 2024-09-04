@@ -196,31 +196,27 @@ class FictracTask(Task):
     """ 
     Task to run fictrac to track the ball movement and save the results in the main processed dataframe.
     """
-
     def __init__(self):
         super().__init__()
         self.name = "fictrac"
         self.prerequisites = []
 
     def _run(self, torun_dict, log):
-        # check if overwrite = True
-        # if so, show a warning (fictrac will make a new file, not really overwrite)
-        if torun_dict['overwrite']:
-            log.add_line_to_log("WARNING: Overwrite = True for fictrac task will be ignored, as fictrac will create a new file regardless.")
-
-        # run fictrac
-        fictrac.config_and_run_fictrac(self.full_path(torun_dict))
-        # convert output to df and save it
-        fictract_df_path = fictrac.get_fictrac_df(self.full_path(torun_dict))
-        # combine the fictrac df with the main processed df
-        combine_df(self.full_path(torun_dict), fictract_df_path, log)
+        try:
+            # run fictrac and convert output to df
+            fictrac.config_and_run_fictrac(self.full_path(torun_dict))
+            fictract_df_path = fictrac.get_fictrac_df(self.full_path(torun_dict))
+            # combine the fictrac df with the main processed df
+            combine_df(self.full_path(torun_dict), fictract_df_path, log)
+        except Exception as e:
+            log.add_line_to_log(f"Error running fictrac: {e}")
+            raise e
 
 class Df3dTask(Task):
     """ 
     Task to run pose estimation using DeepFly3D and Df3d post processing
     and save results in behaviour dataframe.
     """
-
     def __init__(self):
         super().__init__()
         self.name = "df3d"
@@ -229,14 +225,29 @@ class Df3dTask(Task):
     def _run(self, torun_dict, log):
         trial_dir = self.full_path(torun_dict)
         try:
+            # run df3d, postprocess and get df
             df3d.run_df3d(trial_dir, log)
             df3d.postprocess_df3d_trial(trial_dir)
-
+            df3d_df_path = df3d.get_df3d_df(trial_dir)
+            # combine the df3d df with the main processed df
+            combine_df(trial_dir, df3d_df_path, log)
 
         except Exception as e:
             log.add_line_to_log(f"Error running df3d: {e}")
             raise e
 
+class DfTask(Task):
+    """ 
+    Task create a general behavior dataframe with the results of all other tasks.
+    """
+    def __init__(self):
+        super().__init__()
+        self.name = "df"
+        self.prerequisites = []
+
+    def _run(self, torun_dict, log):
+
+        pass
     
         
 
@@ -253,9 +264,12 @@ class Df3dTask(Task):
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
 #     def _run(self, torun_dict, log):
-#         # enter functions to run here
-#         # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
-        
+#         # try:
+#           # enter functions to run here
+#           # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
+#         # except Exception as e:
+#           # log.add_line_to_log(f"Error running name: {e}")
+#           # raise e
 
 
 ## END OF TASK DEFINITIONS

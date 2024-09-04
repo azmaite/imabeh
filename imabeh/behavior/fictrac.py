@@ -419,6 +419,31 @@ def _move_fictrac_output(video_file, output_dir):
 
 ## FUNCTIONS TO READ FICTRAC OUTPUT
     
+def find_fictrac_file(directory, camera=3, most_recent=False):
+    """
+    This function finds the path to the output file of fictrac of the form `camera_{cam}*.dat`, 
+    where `{cam}` is the values specified in the `camera` argument. 
+    If multiple files with this name are found and most_recent = False, it throws an exception.
+    otherwise, it returns the most recent file.
+
+    Parameters
+    ----------
+    directory : str
+        Directory in which to search.
+    camera : int
+        The camera used for fictrac.
+
+    Returns
+    -------
+    path : str
+        Path to fictrac output file.
+
+    """
+    return find_file(directory,
+                      f"camera_{camera}*.dat",
+                      "fictrac output",
+                      most_recent=most_recent)
+
 def _get_septacam_fps(trial_dir):
     """get the fps of the septacam from the metadata file
 
@@ -479,7 +504,7 @@ def get_fictrac_df(trial_dir, med_filt_size=5, sigma_gauss_size=10):
     f_s = _get_septacam_fps(trial_dir)
 
     # find the most recent fictrac output file
-    fictrac_output = behaviormain.find_fictrac_file(trial_dir, camera=CAMERA_NUM, most_recent=True)
+    fictrac_output = find_fictrac_file(trial_dir, camera=CAMERA_NUM, most_recent=True)
     # read the data
     fictrac_df = pd.read_csv(fictrac_output, header=None, names=COL_NAMES)
     
