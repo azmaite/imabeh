@@ -32,7 +32,6 @@ import json
 import glob
 from scipy.ndimage import gaussian_filter1d, median_filter
 
-from imabeh.behavior import behaviormain
 from imabeh.general import main
 
 # IMPORT ALL PATHS FROM USERPATHS - DO NOT add any paths outside of this import 
@@ -458,7 +457,7 @@ def _get_septacam_fps(trial_dir):
         frame rate of the septacam as given by the metadata file
     """   
 
-    cam_metadata_file = behaviormain.find_seven_camera_metadata_file(trial_dir)
+    cam_metadata_file = main.find_seven_camera_metadata_file(trial_dir)
     metadata = json.load(open(cam_metadata_file))
     f_s = metadata['FPS']
 
@@ -531,6 +530,9 @@ def get_fictrac_df(trial_dir, med_filt_size=5, sigma_gauss_size=10):
                              "integrated_side_movement", "delta_rot_lab_side",
                              "delta_rot_lab_forward", "delta_rot_lab_turn", "v", "th",
                              "v_forw", "v_side", "v_turn"]]
+    
+    # add the framerate as an atribute
+    fictrac_df.attrs["fps"] = f_s
     
     # save the dataframe in the same folder as the fictrac output as a pickle file
     df_out_dir = os.path.join(os.path.dirname(fictrac_output), "fictrac_df.pkl")

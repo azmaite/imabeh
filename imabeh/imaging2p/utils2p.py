@@ -9,6 +9,7 @@ COPIED FROM NeLy-EPFL/utils2p (almost identical) - changes:
 Available functions:
 
 * FUNCTIONS TO FIND IMAGING SPECIFIC FILES
+    - find_file
     - find_raw_file
     - find_metadata_file
 
@@ -37,8 +38,7 @@ import tifffile
 import array
 import glob
 import xml.etree.ElementTree as ET
-
-from imabeh.general.main import find_file
+from pathlib import Path
 
 
 # FUNCTIONS TO MANAGE METADATA
@@ -379,6 +379,41 @@ class Metadata(_XMLFile):
 
 # FUNCTIONS TO FIND FILES
 
+def _find_file(directory, name, file_type, most_recent=False):
+    """
+    This function finds a unique file with a given name in the directory.
+    If multiple files with this name are found and most_recent = False, it throws an exception.
+    otherwise, it returns the most recent file.
+
+    Parameters
+    ----------
+    directory : str
+        Directory in which to search.
+    name : str
+        Name of the file.
+    file_type : str
+        Type of the file (for reporting errors only)
+    most_recent : bool, optional
+        If True, return the most recent file if multiple files are found, by default False
+
+    Returns
+    -------
+    path : str
+        Path to file.
+    """
+    file_names = list(Path(directory).rglob(name))
+    if len(file_names) > 1 and not most_recent:
+        raise RuntimeError(
+            f"Could not identify {file_type} file unambiguously. " +
+            f"Discovered {len(file_names)} {file_type} files in {directory}."
+        )
+    elif len(file_names) > 1 and most_recent:
+        file_names = sorted(file_names, key=lambda x: x.stat().st_mtime, reverse=True)
+    elif len(file_names) == 0:
+        raise FileNotFoundError(f"No {file_type} file found in {directory}")
+    
+    return str(file_names[0])
+
 def find_raw_file(directory):
     """
     This function finds the path to the raw file
@@ -398,11 +433,11 @@ def find_raw_file(directory):
     """
     # some versions of ThorImage save the raw file as "Image_001_001.raw or Image_0001_0001.raw"
     try:
-        return find_file(directory,
+        return _find_file(directory,
                           "Image_0001_0001.raw",
                           "raw")
     except:
-        return find_file(directory,
+        return _find_file(directory,
                         "Image_001_001.raw",
                         "raw")
 
@@ -423,7 +458,7 @@ def find_metadata_file(directory):
     path : str
         Path to metadata file.
     """
-    return find_file(directory,
+    return _find_file(directory,
                       "Experiment.xml",
                       "metadata")
 

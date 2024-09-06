@@ -11,7 +11,6 @@ import pandas as pd
 import sys
 
 # IMPORT FUNCTIONS FROM df3d (deepfly3d package) and df3dPostProcessing
-
 from df3d.cli import main as df3dcli
 from df3dPostProcessing.df3dPostProcessing import df3dPostProcess, df3d_skeleton
 

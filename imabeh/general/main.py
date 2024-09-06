@@ -2,7 +2,9 @@
 Available functions:
     - find_file
     - find_sync_file
+    - find_seven_camera_metadata_file
     - run_shell_command
+    - get_sync_df
     - combine_df
 """
 
@@ -15,6 +17,8 @@ import numpy as np
 
 from imabeh.run.userpaths import user_config
 from imabeh.run.logmanager import LogManager
+from imabeh.imaging2p import utils2p
+from imabeh.general import syncronization as sync
 
 
 def find_file(directory, name, file_type, most_recent=False):
@@ -72,7 +76,56 @@ def find_sync_file(directory):
                       "Episode001.h5",
                       "synchronization")
 
-def run_shell_command(command, allow_ctrl_c=True, suppress_output=False) -> bool:
+def find_sync_metadata_file(directory):
+    """
+    This function finds the path to the synchronization
+    metadata file "ThorRealTimeDataSettings.xml" created
+    by ThorSync. If multiple files with this name are found,
+    it throws an exception.
+
+    Parameters
+    ----------
+    directory : str
+        Directory in which to search.
+
+    Returns
+    -------
+    path : str
+        Path to synchronization metadata file.
+
+    Examples
+    --------
+    >>> import utils2p
+    >>> utils2p.find_sync_metadata_file("data/mouse_kidney_raw")
+    'data/mouse_kidney_raw/2p/Sync-025/ThorRealTimeDataSettings.xml'
+
+    """
+    return find_file(directory,
+                      "ThorRealTimeDataSettings.xml",
+                      "synchronization metadata"
+                      )
+
+def find_seven_camera_metadata_file(directory):
+    """
+    This function finds the path to the metadata file "capture_metadata.json" 
+    created by seven camera setup and returns it.
+    If multiple files with this name are found, it throws an exception.
+
+    Parameters
+    ----------
+    directory : str
+        Directory in which to search.
+
+    Returns
+    -------
+    path : str
+        Path to capture metadata file.
+    """
+    return find_file(directory,
+                      "capture_metadata.json",
+                      "seven camera capture metadata")
+
+def run_shell_command(command, suppress_output=False) -> bool:
     """use the subprocess module to run a shell command
 
     Parameters
@@ -110,7 +163,99 @@ def run_shell_command(command, allow_ctrl_c=True, suppress_output=False) -> bool
         return True
     else:
         return False
+
+def get_sync_df(trial_dir):
+    """
+    Function to generate an empty processed dataframe from the Thorsync data.
+    Including the frame times for two photon and behavioural data,
+    as well as the optogenetic stimulation timeseries.
+    Fictrac, df3d, and imaging processed data can be later added.
+    """
+    # get the sync files etc
+    # if behavior/imaging are not present, some files will not be found
+    sync_file = find_sync_file(trial_dir) # any
+    sync_metadata_file = find_sync_metadata_file(trial_dir) # any
+    try:
+        septacam_metadata_file = find_seven_camera_metadata_file(trial_dir) # behavior only
+    except FileNotFoundError:
+        septacam_metadata_file = None
+    try:    
+        metadata_2p_file = utils2p.find_metadata_file(trial_dir) # imaging only
+    except FileNotFoundError:
+        metadata_2p_file = None
+
+    # process lines
+    processed_lines = sync.get_processed_lines(sync_file, sync_metadata_file, septacam_metadata_file, metadata_2p_file)
+
+    # add the processed lines to the dataframe
+    # make empty dataframe
+    sync_df = pd.DataFrame()
+    # add general info from the trial_dir as attributes
+    sync_df = _add_attributes_to_df(sync_df, trial_dir)
+
+    # if behavior - add frames and times:
+    if septacam_metadata_file is not None:
+        # get indeces of rising edges of the cameras (including first non-nan value)
+        cam = processed_lines['Cameras']
+        cam_idx = np.append(np.where(~np.isnan(cam))[0][0], sync.edges(cam)[0])
+        # get times
+        cam_times = processed_lines['Times'][cam_idx]
+        # add to dataframe
+        sync_df["Septacam_frames"] = cam[cam_idx].astype(int)
+        sync_df["Time"] = cam_times
+
+
+        # if ALSO imaging - add 2p frames in relation to behavior frames:
+        if metadata_2p_file is not None:
+            scope = processed_lines['Frame Counter']
+            scope_idx = scope[cam_idx]
+            sync_df["2p_frames"] = scope_idx.astype(int)
+
+    # get default main_df_path from trial_dir and user_config
+    # check that dir exists, if not create it
+    main_df_path = os.path.join(trial_dir, user_config["processed_path"])
+    if not os.path.isdir(main_df_path):
+        os.makedirs(main_df_path)
+    main_df_file = os.path.join(main_df_path, "processed_df.pkl")
+    # save the dataframe
+    sync_df.to_csv(main_df_file, index=False)
+
+    return sync_df
+
+
+def _add_attributes_to_df(df, trial_dir):
+    """ 
+    Function to add general info from the trial to the dataframe.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe to add attributes to.
+    trial_dir : str
+        Directory of the trial.
     
+    Returns
+    -------
+    df : pd.DataFrame
+        Dataframe with added attributes
+    """
+
+    # trial_dir format = A/B/long_path/YYMMDD_GENOTYPE_GENOTYPE/FLY/TRIAL_TRIAL
+    path_split = trial_dir.split('/')
+    df.attrs["Trial"] = path_split[-1]
+    df.attrs["Fly"] = path_split[-2]
+    df.attrs["Genotype"] = path_split[-3][7:]
+
+    # convert date format from YYMMDD to YYYY-MM-DD
+    date = path_split[-3][:6]
+    df.attrs["Date"] = "20" + date[:2] + "-" + date[2:4] + "-" + date[4:]
+
+    # add the scope used as an atribute too
+    df.attrs["Scope"] = user_config["scope"]
+
+    return df
+
+
 def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     """
     This function combines two dataframes by concatenating them along the rows.
@@ -139,30 +284,35 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     # read the new dataframe (.pkl)
     new_df = pd.read_pickle(new_df_path)
 
-    # check if main df exists - if so, add new df to it
-    if os.path.isfile(main_df_path):
-        main_df = pd.read_csv(main_df_path)
-        # check that both df have the same length (number of frames)
-        if len(main_df) != len(new_df):
-            if np.abs(len(main_df) - len(new_df)) <=10:
-                raise ValueError("Number of frames in main and new df do not match. \n"+\
-                    "Main_df has {} ticks, new_df has {} lines. \n".format(len(main_df), len(new_df))+\
-                    "Trial: "+ trial_dir)
-        # add to main_df
-        for key in list(new_df.keys()):
-            # check if key aready exists in main_df. If so, log (and replace)
-            if key in list(main_df.keys()):
-                log.add_line_to_log("  Replacing key {} in main processing dataframe at {}".format(key, main_df_path))
-            main_df[key] = new_df[key].values
-
-    # if it doesn't exist, make the new df the main df
-    # log the creation of the main dataframe
+    # check if main df exists - if not, create use using get_sync_df
+    if not os.path.isfile(main_df_path):
+        main_df = get_sync_df(trial_dir)
+        # log that the main dataframe was created
+        log.add_line_to_log("  Main processing dataframe created at {}".format(main_df_path))
     else:
-        main_df = new_df
-        log.add_line_to_log("--- Created main processing dataframe at " + main_df_path)
+        main_df = pd.read_csv(main_df_path)
+    
+
+    # check that both df have the same length (number of frames)
+    if len(main_df) != len(new_df):
+        if np.abs(len(main_df) - len(new_df)) <=10:
+            raise ValueError("Number of frames in main and new df do not match. \n"+\
+                "Main_df has {} ticks, new_df has {} lines. \n".format(len(main_df), len(new_df))+\
+                "Trial: "+ trial_dir)
+    # add new to main_df
+    for key in list(new_df.keys()):
+        # check if key aready exists in main_df. If so, log (and replace)
+        if key in list(main_df.keys()):
+            log.add_line_to_log("  Replacing key {} in main processing dataframe at {}".format(key, main_df_path))
+        main_df[key] = new_df[key].values
+
+    # combine atributes too, if any!
+    for key in list(new_df.attrs.keys()):
+        main_df.attrs[key] = new_df.attrs[key]
 
     # save the main dataframe
     main_df.to_csv(main_df_path, index=False)
+
 
 
 

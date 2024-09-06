@@ -30,11 +30,12 @@ from imabeh.run.logmanager import LogManager
 from imabeh.general.main import combine_df
 
 # task specific imports
-from imabeh.imaging import utils2p
-from imabeh.behavior import fictrac
-from imabeh.behavior import df3d
+from imabeh.imaging2p import utils2p
+from imabeh.behavior import fictrac, df3d
+from imabeh.general import main
 
 
+# general task class
 class Task:
     """
     Base class to implement a particular processing step.
@@ -147,6 +148,9 @@ class Task:
 
 
 ## ALL TASKS DEFINED BELOW
+## ----------------------------------------------- ##
+
+# Test tasks
 
 class TestTask1(Task):
     """ Useless task for testing purposes.
@@ -178,6 +182,9 @@ class TestTask2(Task):
         time.sleep(2)
         print(f"    {self.name} task 2 done")
     
+
+# Imaging tasks
+
 class TifTask(Task):
     """
     Task to convert .raw files to .tif files.
@@ -192,6 +199,23 @@ class TifTask(Task):
         # convert raw to tiff
         utils2p.create_tiffs(self.full_path(torun_dict))
 
+
+# Behavior tasks
+
+class DfTask(Task):
+    """ 
+    Task create a general behavior dataframe with info from Thorsync.
+    Df3d and fictrac dataframes will be combined with this dataframe.
+    This also gets the info on optogenetic stimulation from the thorsync file.
+    """
+    def __init__(self):
+        super().__init__()
+        self.name = "df"
+        self.prerequisites = []
+
+    def _run(self, torun_dict, log):
+        main.get_sync_df(self.full_path(torun_dict))
+
 class FictracTask(Task):
     """ 
     Task to run fictrac to track the ball movement and save the results in the main processed dataframe.
@@ -199,7 +223,7 @@ class FictracTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "fictrac"
-        self.prerequisites = []
+        self.prerequisites = ["df"]
 
     def _run(self, torun_dict, log):
         try:
@@ -220,7 +244,7 @@ class Df3dTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "df3d"
-        self.prerequisites = []
+        self.prerequisites = ["df"]
 
     def _run(self, torun_dict, log):
         trial_dir = self.full_path(torun_dict)
@@ -235,22 +259,6 @@ class Df3dTask(Task):
         except Exception as e:
             log.add_line_to_log(f"Error running df3d: {e}")
             raise e
-
-class DfTask(Task):
-    """ 
-    Task create a general behavior dataframe with the results of all other tasks.
-    """
-    def __init__(self):
-        super().__init__()
-        self.name = "df"
-        self.prerequisites = []
-
-    def _run(self, torun_dict, log):
-
-        pass
-    
-        
-
 
 
 # # TEMPLATE FOR NEW TASKS
