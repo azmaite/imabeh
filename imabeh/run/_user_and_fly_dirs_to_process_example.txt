@@ -1,6 +1,18 @@
+# current user of the processing pipelines and
 # fly dirs to be selected for preprocessing and which tasks to run on them
-# example configs below.
+# example configs below:
 
+
+## Current user of the processing pipelines
+# determines the scope used and the location of the data within the labserver
+# as well as any other non-default parameters
+# must match existing dictionary in 'run/userpaths.py'
+# Examples: 
+
+CURRENT_USER = USER_MA_2p2
+CURRENT_USER = USER_JSP_scope
+
+## Files to process and tasks
 # General format:
 # experiment_path/Fly#||selected trials (a comma separated list of the beginning sequence of the trials without spaces)||task1,task2,!task3
 # to run a pipeline of tasks (as defined in 'run/pipelines.py'), use the pipeline name starting with 'p_' (i.e. p_PipelineName)
