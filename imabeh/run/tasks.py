@@ -47,11 +47,6 @@ class Task:
         self.name = ""
         self.params = None
         self.prerequisites = []
-    
-    def full_path(self, torun_dict):
-        """ get full path of trial, using user_config.labserver_data """
-        return os.path.join(user_config["labserver_data"], torun_dict['fly_dir'], torun_dict['trial'])
-    
 
     def start_run(self, torun_dict : dict, log : LogManager) -> str:
         """
@@ -197,7 +192,7 @@ class TifTask(Task):
 
     def _run(self, torun_dict, log):
         # convert raw to tiff
-        utils2p.create_tiffs(self.full_path(torun_dict))
+        utils2p.create_tiffs(self.torun_dict['full_path'])
 
 
 # Behavior tasks
@@ -214,7 +209,7 @@ class DfTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log):
-        main.get_sync_df(self.full_path(torun_dict))
+        main.get_sync_df(self.torun_dict['full_path'])
 
 class FictracTask(Task):
     """ 
@@ -228,10 +223,10 @@ class FictracTask(Task):
     def _run(self, torun_dict, log):
         try:
             # run fictrac and convert output to df
-            fictrac.config_and_run_fictrac(self.full_path(torun_dict))
-            fictract_df_path = fictrac.get_fictrac_df(self.full_path(torun_dict))
+            fictrac.config_and_run_fictrac(self.torun_dict['full_path'])
+            fictract_df_path = fictrac.get_fictrac_df(self.torun_dict['full_path'])
             # combine the fictrac df with the main processed df
-            combine_df(self.full_path(torun_dict), fictract_df_path, log)
+            combine_df(self.torun_dict['full_path'], fictract_df_path, log)
         except Exception as e:
             log.add_line_to_log(f"Error running fictrac: {e}")
             raise e
@@ -247,7 +242,7 @@ class Df3dTask(Task):
         self.prerequisites = ["df"]
 
     def _run(self, torun_dict, log):
-        trial_dir = self.full_path(torun_dict)
+        trial_dir = self.torun_dict['full_path']
         try:
             # run df3d, postprocess and get df
             df3d.run_df3d(trial_dir, log)
