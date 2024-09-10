@@ -358,7 +358,7 @@ def _run_fictrac_config_gui(config_file, fictrac_config_gui="~/bin/fictrac/bin/c
     """
     directory = os.path.dirname(config_file)
     command = f'/bin/bash -c "cd {directory} && yes | xvfb-run -a {fictrac_config_gui} {config_file}"'
-    success = main.run_shell_command(command, allow_ctrl_c=False, suppress_output=True)
+    success = main.run_shell_command(command, suppress_output=True)
 
     return success
 
@@ -379,7 +379,7 @@ def _run_fictrac(config_file, fictrac="~/bin/fictrac/bin/fictrac"):
         whether fictrac was run successfully
     """
     command = f"{fictrac} {config_file}"
-    success = main.run_shell_command(command, allow_ctrl_c=True, suppress_output=False)
+    success = main.run_shell_command(command, suppress_output=False)
     print(f"success = {success}")
     return success
 
@@ -438,7 +438,7 @@ def find_fictrac_file(directory, camera=3, most_recent=False):
         Path to fictrac output file.
 
     """
-    return find_file(directory,
+    return main.find_file(directory,
                       f"camera_{camera}*.dat",
                       "fictrac output",
                       most_recent=most_recent)
