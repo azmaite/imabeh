@@ -68,7 +68,7 @@ class LogManager():
             log_date = pd.to_datetime(log_file[-19:-4], format='%Y%m%d_%H%M%S')
             
             # Delete if older than 14 days
-            if pd.Timestamp.now() - log_date > pd.Timedelta(minutes=30):#(days=14): # for testing, delete logs older than 30 minutes - change to days=14 when ready!
+            if pd.Timestamp.now() - log_date > pd.Timedelta(days=14): 
                 os.remove(os.path.join(self.log_folder, log_file))
 
 

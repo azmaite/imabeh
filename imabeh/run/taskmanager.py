@@ -86,7 +86,7 @@ class TaskManager():
 
     ## MAIN FUNCTIONS
 
-    def _create_torun_table(self, txt_file: str, log: LogManager):
+    def _create_torun_table(self, log: LogManager):
         """
         reads the supplied text file and 
         creates the torun_table from the list of trials/tasks to process
@@ -110,6 +110,7 @@ class TaskManager():
         self.torun_table with the following columns, containing the toruns from self.trials_to_process:
             - "fly_dir": the base directory of the fly
             - "trial": which trial to run on
+            - "full_path": the full path to the trial directory (dir/trial)
             - "task": the name of the task to run
             - "overwrite": whether or not to force an overwrite of the previous results
             - "status": whether the to_run is "ready", "running", or "waiting"
@@ -123,7 +124,7 @@ class TaskManager():
         self.torun_table = pd.DataFrame(columns=header)
 
         # read the text file and get the list of flies/trials/tasks to process
-        fly_dicts = self._read_fly_dirs(txt_file) 
+        fly_dicts = self._read_fly_dirs(self.txt_file_to_process) 
 
         # fill with new toruns from the fly_dicts
         # checks that fly dirs exist and that tasks are valid (in task_collection) - log if not
@@ -167,12 +168,13 @@ class TaskManager():
         run the tasks manager to sequentially process all toruns from self.torun_dicts.
         """
         # log the start of the task manager
-        log.add_line_to_log("-------TASK MANAGER STARTED-------\n")
+        log.add_line_to_log("\n-------TASK MANAGER STARTED-------\n")
 
         # check if there are tasks left to run
         while self.n_toruns:
 
             # checks all "running" tasks to see if any have finished - correctly (1) or with errors (2)
+            # this will only be necessary for tasks that are run outside of python/bash (ex. on the cluster)
             any_finished = False
             running_tasks = self.torun_table[self.torun_table['status'] == "running"]
 
@@ -253,17 +255,17 @@ class TaskManager():
         fly_dicts = []
         for line in lines:
             # ignore commented lines
-            if line.startswith("#") or line == "":
+            if line.startswith("#") or line == "" or line.startswith("CURRENT_USER"):
                 continue
             # split into sections (fly_dir,trials,tasks)
             strings = line.split("||")
             # split trials and tasks to make a list of each
             trials = strings[1].split(',')
-            tasks = strings[3].split(',')
+            tasks = strings[2].split(',')
             # make fly_dict
             fly_dict = {
                 "fly_dir": strings[0],
-                "trial": trials,
+                "trials": trials,
                 "tasks": tasks,
                 }
             fly_dicts.append(fly_dict)
@@ -306,7 +308,8 @@ class TaskManager():
             new_torun = deepcopy(trial_dict)
             new_torun["trial"] = trial_name
             new_torun["task"] = task_name
-            new_torun["full_path"] = os.path.join(new_torun['fly_dir'],trial_name)
+            main_path = user_config["labserver_data"]
+            new_torun["full_path"] = os.path.join(main_path,new_torun['fly_dir'],trial_name)
 
             # check that fly dir exists - if not, move on to next torun
             if not os.path.exists(new_torun["full_path"]):

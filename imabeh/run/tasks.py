@@ -76,23 +76,31 @@ class Task:
         log.add_line_to_log(f"Starting {self.name} task for trial {trial_path} @ {datetime.now().isoformat(sep=' ')}")
 
         # log that the task is running into the taskstatus log file (create a new log)
+        # this will keep detailed information about the task in case of failure, including errors
+        # it can also be used to check if the task has finished for non python/bash tasks
         task_log = LogManager(log_name = f"_task_{self.name}_status")
         task_log.add_line_to_log("running started at " + datetime.now().isoformat(sep=' '))
 
         try:
             # RUN TASK!!!
-            self._run(torun_dict, log)
+            # for tasks run in python/bash, when the script runs to the end, it will return finished = True
+            # for taks run elsewhere (ex. the cluster), it will return finished = False. In this case,
+            # the taskstatus log file will be used to check if the task has finished
+            # (make sure to implement the test_finished method in the Task subclass for these cases!!!!)
+            finished = self._run(torun_dict, log)
 
-            # log the correct end of the task
-            task_log.add_line_to_log("finished successfully at " + time.ctime(time.time()))
+            # log the correct end of the task - if finished
+            if finished:
+                task_log.add_line_to_log("finished successfully at " + time.ctime(time.time()))
+            else:
+                # return the path to the taskstatus log file
+                return os.path.join(task_log.log_folder,task_log.log_file)
 
         except Exception as e:
             # log the failure of the task
             task_log.add_line_to_log("failed at " + time.ctime(time.time()))
             task_log.add_line_to_log(f"  Error: {e}")
 
-        # return the path to the taskstatus log file
-        return os.path.join(task_log.log_folder,task_log.log_file)
 
     def _run(self, torun_dict):
         """
@@ -103,43 +111,13 @@ class Task:
     def test_finished(self, torun_dict: dict) -> int:
         """
         abstract method to check if the task has finished by reading the taskstatus_log file
-
-        Parameters
-        ----------
-        torun_dict : dict
-            - fly_dir: str, the base directory of the fly, where the data is stored
-            - trial: trial to run the task on
-            - overwrite: bool, whether or not to force an overwrite of the previous results
-            - status: bool, whether the task is "ready", "running", or "waiting" - should always be "running" for this method
-            - taskstatus_log: str, the path to the taskstatus log file
-
-        Returns
-        -------
-        int
-            0 = still running, 1 = finished sucessfully, 2 = failed (finished with errors)
+        Should not be implemented for tasks that are run in python/bash, only for tasks run elsewhere (ex. the cluster)
+        - For tasks run in python/bash, python will know when the task has finished by the end of the script (no need to check)
+        - For tasks run elsewhere, the taskstatus log file should be used to check to see if the task has finished
+          (every certain time, the TaskManager will check if the task has finished using this method)
         """
 
-        # get the path to the taskstatus log file
-        task_log = torun_dict['taskstatus_log']
-
-        # read the LAST line of the log file
-        with open(task_log, 'r') as f:
-            lines = f.readlines()
-            last_line = lines[-1]   
-        
-        # get the status from the START of the last line
-        if last_line.startswith("finished successfully"):
-            # delete the taskstatus log file
-            os.remove(task_log)
-            return 1
-        elif last_line.startswith("failed") or last_line.startswith("  Error"):
-            # don't delte log, might want to check!
-            return 2
-        elif last_line.startswith("running"):
-            return 0
-        # otherwise raise error
-        else:
-            raise ValueError("Taskstatus log file is corrupted or not in the correct format")
+        raise NotImplementedError(f"Task {self.name} does not have a test_finished method implemented")
 
 
 ## ALL TASKS DEFINED BELOW
@@ -156,11 +134,12 @@ class TestTask1(Task):
         self.name = "test1"
         self.prerequisites = []
 
-    def _run(self, torun_dict, log):
+    def _run(self, torun_dict, log) -> bool:
         # RUN TASK!!!
         print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
         print(f"    {self.name} task done")
+        return True
 
 class TestTask2(Task):
     """ Useless task 2 for testing purposes.
@@ -171,12 +150,12 @@ class TestTask2(Task):
         self.name = "test2"
         self.prerequisites = ['test1']
 
-    def _run(self, torun_dict, log):
+    def _run(self, torun_dict, log) -> bool:
         # RUN TASK!!!
         print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
         time.sleep(2)
         print(f"    {self.name} task 2 done")
-    
+        return True
 
 # Imaging tasks
 
@@ -190,9 +169,10 @@ class TifTask(Task):
         self.name = "tif"
         self.prerequisites = []
 
-    def _run(self, torun_dict, log):
+    def _run(self, torun_dict, log) -> bool:
         # convert raw to tiff
-        utils2p.create_tiffs(self.torun_dict['full_path'])
+        utils2p.create_tiffs(torun_dict['full_path'])
+        return True
 
 
 # Behavior tasks
@@ -208,8 +188,9 @@ class DfTask(Task):
         self.name = "df"
         self.prerequisites = []
 
-    def _run(self, torun_dict, log):
-        main.get_sync_df(self.torun_dict['full_path'])
+    def _run(self, torun_dict, log) -> bool:
+        main.get_sync_df(torun_dict['full_path'])
+        return True
 
 class FictracTask(Task):
     """ 
@@ -220,16 +201,18 @@ class FictracTask(Task):
         self.name = "fictrac"
         self.prerequisites = ["df"]
 
-    def _run(self, torun_dict, log):
+    def _run(self, torun_dict, log) -> bool:
         try:
             # run fictrac and convert output to df
-            fictrac.config_and_run_fictrac(self.torun_dict['full_path'])
-            fictract_df_path = fictrac.get_fictrac_df(self.torun_dict['full_path'])
+            fictrac.config_and_run_fictrac(torun_dict['full_path'])
+            fictract_df_path = fictrac.get_fictrac_df(torun_dict['full_path'])
             # combine the fictrac df with the main processed df
-            combine_df(self.torun_dict['full_path'], fictract_df_path, log)
+            combine_df(torun_dict['full_path'], fictract_df_path, log)
         except Exception as e:
             log.add_line_to_log(f"Error running fictrac: {e}")
             raise e
+        
+        return True
 
 class Df3dTask(Task):
     """ 
@@ -241,8 +224,8 @@ class Df3dTask(Task):
         self.name = "df3d"
         self.prerequisites = ["df"]
 
-    def _run(self, torun_dict, log):
-        trial_dir = self.torun_dict['full_path']
+    def _run(self, torun_dict, log) -> bool:
+        trial_dir = torun_dict['full_path']
         try:
             # run df3d, postprocess and get df
             df3d.run_df3d(trial_dir, log)
@@ -254,6 +237,8 @@ class Df3dTask(Task):
         except Exception as e:
             log.add_line_to_log(f"Error running df3d: {e}")
             raise e
+    
+        return True
 
 
 # # TEMPLATE FOR NEW TASKS
@@ -266,13 +251,14 @@ class Df3dTask(Task):
 #         self.name = "name"
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
-#     def _run(self, torun_dict, log):
+#     def _run(self, torun_dict, log) -> bool:
 #         # try:
 #           # enter functions to run here
 #           # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
 #         # except Exception as e:
 #           # log.add_line_to_log(f"Error running name: {e}")
 #           # raise e
+#         return True
 
 
 ## END OF TASK DEFINITIONS
