@@ -233,7 +233,7 @@ class Df3dTask(Task):
         trial_dir = torun_dict['full_path']
         try:
             # run df3d, postprocess and get df
-            df3d.run_df3d(trial_dir, log)
+            df3d.run_df3d(trial_dir)
             df3d.postprocess_df3d_trial(trial_dir)
             df3d_df_path = df3d.get_df3d_df(trial_dir)
             # combine the df3d df with the main processed df

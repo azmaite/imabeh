@@ -17,11 +17,10 @@ from df3dPostProcessing.df3dPostProcessing import df3dPostProcess, df3d_skeleton
 # IMPORT ALL PATHS FROM USERPATHS - DO NOT add any paths outside of this import 
 from imabeh.run.userpaths import user_config, LOCAL_DIR
 
-from imabeh.run.logmanager import LogManager
 from imabeh.general.main import find_file
 
 
-def run_df3d(trial_dir : str, log : LogManager):
+def run_df3d(trial_dir : str):
     """run deepfly3d
 
     Parameters
@@ -29,8 +28,6 @@ def run_df3d(trial_dir : str, log : LogManager):
     trial_dir : str
         directory of the trial. should contain "behData/images" folder
         df3d will be saved within this trial folder as specified in the user_config
-    log: LogManager
-        log manager object to log the task status
     """
 
     # Get the output_dir and camera_ids from user_config as well as the images_dir
