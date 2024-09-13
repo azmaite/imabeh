@@ -269,34 +269,38 @@ class TaskManager():
                 }
             fly_dicts.append(fly_dict)
 
-        # check that all fly_dirs are real folders - if not, log and remove
-        for f, fly_dict in enumerate(fly_dicts):
+        # iterate across fly_dicts to check for modifications
+        # (in reverse order so elements can be removed without affecting the loop)
+        for f, fly_dict in reversed(list(enumerate(fly_dicts))): 
+
+            # check that all fly_dirs are real folders - if not, log and remove
             fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
             if not os.path.isdir(fly_dir):
                 log.add_line_to_log(f"Fly dir '{fly_dir}' does not exist.")
-                fly_dicts[f] = 'ERROR'
-        if 'ERROR' in fly_dicts: fly_dicts.remove('ERROR') 
+                fly_dicts.pop[f]
 
-        # replace pipelines with the tasks they contain
-        # if p-!, add ! in front of all tasks (each will be overwritten)
-        fly_dicts = self._read_pipelines(fly_dicts, log)
+            # replace pipelines with the tasks they contain
+            # if p-!, add ! in front of all tasks (each will be overwritten)
+            fly_dict = self._read_pipelines(fly_dict, log)
 
-        # get all trials if 'all' is present
-        fly_dicts = self._get_all_trials(fly_dicts)
+            # get all trials if 'all' is present
+            fly_dict = self._get_all_trials(fly_dict)
 
-        # get trials based on keyworkds (k-)
-        fly_dicts = self._read_keywords(fly_dicts, log)
+            # get trials based on keyworkds (k-)
+            fly_dict = self._read_keywords(fly_dict, log)
 
-        # get full trial names if needed
-        fly_dicts = self._get_full_trial(fly_dicts, log)
+            # get full trial names if needed
+            fly_dict = self._get_full_trial(fly_dict, log)
 
-        # exclude any specified trials (or starts of trials)
-        fly_dicts = self._exclude_trials
+            # exclude any specified trials (or starts of trials)
+            fly_dict = self._exclude_trials
 
+            # replace in fly_dicts
+            fly_dicts[f] = fly_dict
 
         return fly_dicts
 
-    def _read_pipelines(self, fly_dicts, log):
+    def _read_pipelines(self, fly_dict, log):
         """ If any task starts with 'p-', replace it with the tasks in the pipeline.
         The list of preset pipelines is imported from imabeh/run/tasks.py
 
@@ -304,41 +308,36 @@ class TaskManager():
 
         Parameter and Returns
         ---------------------
-        fly_dicts: List[dict]
-            list of fly_dicts [fly_dir, trials, tasks]
+        fly_dict: dict 
+            dict containing fly_dir, trials, tasks
         log: LogManager
             to log any wrong pipelines entered
         """
-        for f, fly_dict in enumerate(fly_dicts):
-            tasks = fly_dict['tasks']
-            for t, task in enumerate(tasks):
-                if task.startswith("p-"):
-                    # get pipeline name and remove ! if present
-                    pipeline = task[2:].replace("!","")
+        tasks = fly_dict['tasks']
+        for t, task in reversed(list(enumerate(tasks))): # reverse order so elements can be removed without affecting the loop
+            if task.startswith("p-"):
+                # get pipeline name and remove ! if present
+                pipeline = task[2:].replace("!","")
 
-                    # get tasks in pipeline
-                    try:
-                        new_tasks = pipeline_dict[pipeline]
-                    # if pipeline not found in pipeline_dict, log and remove
-                    except KeyError:
-                        log.add_line_to_log(f"Pipeline '{pipeline}' is not defined in pipeline_dict.")
-                        tasks[t] = 'ERROR'
-                        continue
+                # get tasks in pipeline
+                try:
+                    new_tasks = pipeline_dict[pipeline]
+                # if pipeline not found in pipeline_dict, log and remove
+                except KeyError:
+                    log.add_line_to_log(f"Pipeline '{pipeline}' is not defined in pipeline_dict.")
+                    tasks.pop(t)
+                    continue
 
-                    # if overwrite (p-!), add ! in front of all tasks
-                    if task.startswith("p-!"):
-                        new_tasks = ["!" + t for t in new_tasks]
-                    
-                    # replace pipeline with new tasks
-                    tasks[t:t+1] = new_tasks  
+                # if overwrite (p-!), add ! in front of all tasks
+                if task.startswith("p-!"):
+                    new_tasks = ["!" + t for t in new_tasks]
                 
-            # remove any error pipelines, if any
-            tasks = self._remove_errors(tasks, 'ERROR')
+                # replace pipeline with new tasks
+                tasks[t:t+1] = new_tasks  
 
-            # add to fly_dicts
-            fly_dicts[f]['tasks'] = tasks
-        
-        return fly_dicts
+        # add to fly_dict and return
+        fly_dict['tasks'] = tasks
+        return fly_dict
 
     def _get_all_trials(self, fly_dicts):
         """ If any trial is 'all', search the fly_dir and add all folders found as trials 
@@ -361,44 +360,39 @@ class TaskManager():
         
         return fly_dicts
     
-    def _read_keywords(self, fly_dicts, log):
+    def _read_keywords(self, fly_dict, log):
         """ If any trial starts with k-, search the fly_dir and add all folders found as trails 
         if they contain the keywork that follows.
 
         Parameter and Returns
         ---------------------
-        fly_dicts: List[dict]
-            list of fly_dicts [fly_dir, trials, tasks]
+        fly_dict: dict 
+            dict containing fly_dir, trials, tasks
         log: LogManager
-            to log any keyworks that don't match any trials
+            to log any wrong keywords that don't match any trials
         """
-        for f, fly_dict in enumerate(fly_dicts):
-            trials = fly_dict['trials']
-            for t, trial in enumerate(trials):
-                if trial.startswith('k-'):
-                    keyword = trial[2:]
-                    # get list of folders (trials) within fly_dir - but only if they contain the keyword
-                    fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
-                    new_trials = [f for f in os.listdir(fly_dir) 
-                              if os.path.isdir(os.path.join(fly_dir, f)) 
-                              and keyword in f
-                              ]
-                    # if not matching trials were found, log
-                    if len(new_trials) == 0:
-                        log.add_line_to_log(f"No trials match keyword '{keyword}' in fly_dir {fly_dir}.")
-                        trials[t] = 'ERROR'
-                    else:
-                        trials[t:t+1] = new_trials
+        trials = fly_dict['trials']
+        for t, trial in reversed(list(enumerate(trials))): # reverse order so elements can be removed without affecting the loop
+            if trial.startswith('k-'):
+                keyword = trial[2:]
+                # get list of folders (trials) within fly_dir - but only if they contain the keyword
+                fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+                new_trials = [f for f in os.listdir(fly_dir) 
+                            if os.path.isdir(os.path.join(fly_dir, f)) 
+                            and keyword in f
+                            ]
+                # if not matching trials were found, remove and log
+                if len(new_trials) == 0:
+                    log.add_line_to_log(f"No trials match keyword '{keyword}' in fly_dir {fly_dir}.")
+                    trials.pop(t)
+                else:
+                    trials[t:t+1] = new_trials
 
-            # remove any errors, if any
-            trials = self._remove_errors(trials, 'ERROR')
+        # add back to fly_dict and return
+        fly_dict['trials'] = trials
+        return fly_dict
 
-            # add back to fly_dict
-            fly_dicts[f]['trials'] = trials
-        
-        return fly_dicts
-
-    def _get_full_trial(self, fly_dicts, log):
+    def _get_full_trial(self, fly_dict, log):
         """ Instaed of full trial names, the start of the name is sufficient.
         Check whether each trial is a real dir within fly_dir, and if not,
         search for any folder that starts with the trial given.
@@ -406,84 +400,68 @@ class TaskManager():
 
         Parameter and Returns
         ---------------------
-        fly_dicts: List[dict]
-            list of fly_dicts [fly_dir, trials, tasks]
+        fly_dict: dict 
+            dict containing fly_dir, trials, tasks
         log: LogManager
             to log any mistakes in trials
         """
-        for f, fly_dict in enumerate(fly_dicts):
-            trials = fly_dict['trials']
+        trials = fly_dict['trials']
 
-            # get list of folders (trials) within fly_dir
-            fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
-            real_trials = [f for f in os.listdir(fly_dir) if os.path.isdir(os.path.join(fly_dir, f))]
+        # get list of folders (real trials) within fly_dir
+        fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+        real_trials = [f for f in os.listdir(fly_dir) if os.path.isdir(os.path.join(fly_dir, f))]
 
-            for t, trial in enumerate(trials):
-                # check if trial is contained within real_trials (as is not to be excluded)
-                if trial not in real_trials and not trial.startswith('e-'):
-                    # check if any real_trials start with trial
-                    trial_match = [t for t in real_trials if t.startswith(trial)]
-                    # if only one match, replace
-                    if len(trial_match) == 1:
-                        trials[t] = trial_match[0]
-                    # if no matches or more than one, log and remove
-                    else:
-                        log.add_line_to_log(f"Trial {trial} has {len(trial_match)} matches in {fly_dir}.")
-                        trials[t] = 'ERROR'
-            
-             # remove any errors, if any
-            trials = self._remove_errors(trials, 'ERROR')
+        for t, trial in reversed(list(enumerate(trials))): # reverse order so elements can be removed without affecting the loop
+            # check if trial is contained within real_trials (as is not to be excluded)
+            if trial not in real_trials and not trial.startswith('e-'):
+                # check if any real_trials start with trial
+                trial_match = [t for t in real_trials if t.startswith(trial)]
+                # if only one match, replace
+                if len(trial_match) == 1:
+                    trials[t] = trial_match[0]
+                # if no matches or more than one, log and remove
+                else:
+                    log.add_line_to_log(f"Trial {trial} has {len(trial_match)} matches in {fly_dir}.")
+                    trials.pop(t)
 
-            # add to fly_dicts
-            fly_dicts[f]['trials'] = trials
+        # add to fly_dict and return
+        fly_dict['trials'] = trials
+        return fly_dict
         
-        return fly_dicts
-        
-    def _exclude_trials(self,fly_dicts, log):
+    def _exclude_trials(self, fly_dict, log):
         """ If any trial starts with e-, find match in trial list and remove.
         If no match (or too many) is found, log and ignore.
 
         Parameter and Returns
         ---------------------
-        fly_dicts: List[dict]
-            list of fly_dicts [fly_dir, trials, tasks]
+        fly_dict: dict 
+            dict containing fly_dir, trials, tasks
         log: LogManager
-            to log if trial could not be excluded (not found in fly_dict)
+            to log any trial that could not be excluded (not found in fly_dict)
         """
-        for f, fly_dict in enumerate(fly_dicts):
-            trials = fly_dict['trials']
-            for t, trial in enumerate(trials):
-                if trial.startswith('e-'):
-                    exclude = trial[2:]
+        trials = fly_dict['trials']
+        for t, trial in enumerate(trials):
+            if trial.startswith('e-'):
+                exclude = trial[2:]
 
-                    # find any other matching trials to exclude
-                    match = [t for t in trials if t.startswith(exclude)]
-                    # if no matches are found, ignore
-                    if len(match) == 0:
-                        log.add_line_to_log(f"Excluded trial {exclude} has NO matches in fly_dir {fly_dict['fly_dir']}. IGNORED.")
-                    # otherwise, ignore all matches
-                    else:
-                        trials = ['EXCLUDED' if t.startswith(match[0]) else t for t in trials]
-                        if len(match) > 1:
-                            log.add_line_to_log(f"Excluded trial {exclude} has {len(match)} matches in fly_dir {fly_dict['fly_dir']}. ALL WILL BE EXCLUDED")
+                # find any other matching trials to exclude
+                match = [t for t in trials if t.startswith(exclude)]
+                # if no matches are found, ignore
+                if len(match) == 0:
+                    log.add_line_to_log(f"Excluded trial {exclude} has NO matches in fly_dir {fly_dict['fly_dir']}. IGNORED.")
+                # otherwise, exclude all matches
+                else:
+                    trials = [t for t in trials if not t.startswith(match[0])]
+                    # warn in log if more than one match
+                    if len(match) > 1:
+                        log.add_line_to_log(f"Excluded trial {exclude} has {len(match)} matches in fly_dir {fly_dict['fly_dir']}. ALL WILL BE EXCLUDED")
 
-                    # remove all e- trials
-                    trials[t] = 'EXCLUDED'
+                # remove e- trial itself
+                trials.pop(t)
 
-            # remove all EXCLUDED tasks and those that start with -e
-            trials = self._remove_errors(trials, 'EXCLUDED')
-
-            # add to fly_dicts
-            fly_dicts[f]['trials'] = trials
-        
-        return fly_dicts
-    
-    def _remove_errors(any_list: list[str], error: str):
-        for s in reversed(any_list):
-            if s == error:
-                any_list.remove(s)
-        
-        return any_list
+        # add to fly_dict and return
+        fly_dict['trials'] = trials
+        return fly_dict
 
 
     ## SUPPORTING FUNCTIONS - for create_torun_table [_add_toruns_from_trial]
