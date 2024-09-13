@@ -9,6 +9,7 @@ COPIED FROM NeLy-EPFL/utils2p - few changes:
 - removed get_lines_from_h5_file (already deprecated)
 - removed .astype(int) in returns (was giving errors and was already int or nan)
 - changed get_processed_lines: original did not work if imaging and/or behavior were not present
+- added _get_appropriate_lines: supporting function for get_processed_lines, faster than before as it knows the thorsync structure
 
 """
 
@@ -968,7 +969,7 @@ def get_processed_lines(sync_file,
     """
     
     # get lines from sync file
-    lines = _get_apropriate_lines(sync_file)
+    lines = _get_appropriate_lines(sync_file)
     processed_lines = lines.copy()
 
     # process behavior lines
@@ -1007,7 +1008,7 @@ def get_processed_lines(sync_file,
     return processed_lines
 
 
-def _get_apropriate_lines(sync_file):
+def _get_appropriate_lines_SLOW(sync_file):
     """ Function to get the relevant lines from the sync file,
     depending on the version of ThorSync and the microscope used.
     
@@ -1050,6 +1051,53 @@ def _get_apropriate_lines(sync_file):
             processed_lines["CO2"], 
             processed_lines["Cameras"]
         ) = get_lines_from_sync_file(sync_file, line_names)
+
+    return processed_lines
+
+
+def _get_appropriate_lines(sync_file):
+    """ Function to get the relevant lines from the sync file,
+    depending on the version of ThorSync and the microscope used.
+    
+    Parameters
+    ----------
+    sync_file : str
+        Path to the synchronization file.
+    
+    Returns
+    -------
+    processed_lines : dict
+        Dictionary with all relevant lines.
+    """
+    # initialize dictionary
+    processed_lines = {}
+
+    # get scope from user_config
+    scope = user_config['scope']
+    # warning for scope 1 - NOT TESTED!!! (remove this if it works as expected)
+    if scope == '2p_1':
+        print('WARNING: SCOPE 1 SYNC FILE READING HAS NOT BEEN TESTED!! MAKE SURE IT WORKS')
+
+    # get line names that depend on scope - and their location within the sync file
+    if scope == '2p_1':
+        lines_scope = {"CO2": ["TEMP","CO2_Stim"], "Cameras":["TEMP","Basler"]}
+    elif scope == '2p_2':
+        lines_scope = {"CO2": ["TEMP","CO2"], "Cameras":["TEMP","Cameras"]}
+    # load lines
+    with h5py.File(sync_file, "r") as f:
+        for name, (line_type, line_name) in lines_scope.items():
+            processed_lines[name] = f[line_type][line_name][:].squeeze()[0]
+
+    # try loading other lines - if fail, use old version of line names (Thorsync version)
+    lines = {"CaptureOn": ["TEMP","CaptureOn"], "FrameCounter":["TEMP","FrameCounter"]}
+    with h5py.File(sync_file, "r") as f:
+        try:
+            for name, (line_type, line_name) in lines.items():
+                processed_lines[name] = f[line_type][line_name][:].squeeze()[0]
+        except:
+            lines = {"CaptureOn": ["TEMP","Capture On"], "FrameCounter":["TEMP","Frame Counter"]}
+            for name, (line_type, line_name) in lines.items():
+                processed_lines[name] = f[line_type][line_name][:].squeeze()[0]
 
     return processed_lines
 
