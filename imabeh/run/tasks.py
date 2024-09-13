@@ -1,5 +1,3 @@
-#task_collection
-
 """
 sub-module to define different steps of pre-processing as sub-classes of Task.
 List of all available tasks is defined in task_collection at the bottom (automatically generated).
@@ -17,6 +15,10 @@ On top of this, the general Task class has the following methods:
         - returning the path to the taskstatus log file
     test_finished(self, torun_dict) : to check if the task has finished by reading 
         the taskstatus log file (created by start_run method)
+
+pipeline_dict: 
+    found at the bottom of script, it is a dictionary of standard pipelines to run
+    (each pipeline is a list of tasks)
 """
 
 # general imports
@@ -268,6 +270,12 @@ class Df3dTask(Task):
 
 ## END OF TASK DEFINITIONS
 
+## PIPELINES
+# add new pipeline sets here as list of task names
+pipeline_dict = {
+    "ablation_beh" : ["df", "fictrac", "df3d"],
+    "ablation_stack" : ["tif"],
+    }
 
 
 ## Create the task_collection dictionary automatically
