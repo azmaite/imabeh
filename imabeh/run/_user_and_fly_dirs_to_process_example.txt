@@ -1,5 +1,6 @@
 # current user of the processing pipelines and
 # fly dirs to be selected for preprocessing and which tasks to run on them
+
 # example configs below:
 
 
@@ -14,15 +15,22 @@ CURRENT_USER = USER_JSP_scope
 
 ## Files to process and tasks
 # General format:
-# experiment_path/Fly#||selected trials (a comma separated list of the beginning sequence of the trials without spaces)||task1,task2,!task3
-# to run a pipeline of tasks (as defined in 'run/pipelines.py'), use the pipeline name starting with 'p_' (i.e. p_PipelineName)
-# if a task/pipeline is to be run again even if it has previously been completed, place a '!' before the task name
-# only give relative path within 'labserver_data' folder as found in 'run/userpaths.py'
+# experiment_path/Fly#||trial1,trial2,trial3||task1,task2,task3
 
-#Examples:
-240729_T-36_Ablation/Fly2||002_pre-beh,004_post-beh||p_AblationPipeline
-240621_T-17_MDN-GCaMP6f/Fly1||002_pre-beh||!fictrac,df3d
-240215_T-36_Ablation/Fly1||003_post-beh,005_post-beh||!p_AblationPipeline,df3d
+# Modifications:
+#    instead of the full trial name, the begginning of the trial name is enough (usually the trial number)
+#    'all' instead of the trial name will fetch all trials in the fly dir (unless excluded using e-)
+#    k- before a trial indicates trial keyword (all trials with that keyword will be included, unless excluded using e-)
+#    e- before a trial name (or start of name) indicates this trial will be excluded
+#
+#    ! before a task forces an overwrite.
+#    p- before a task indicates pipeline (a preset set of tasks)
+
+# Examples:
+240729_T-36_Ablation/Fly2||002_pre-beh,004_post-beh||!fictrac,df3d
+240621_T-17_MDN-GCaMP6f/Fly1||002,003,005||p-ablation
+240215_T-36_Ablation/Fly1||k-stack,e-003||p-!stack,df
+240210_T-2_Test/Fly3||all,e-005_error||p-stack,fictrac
 
 
 

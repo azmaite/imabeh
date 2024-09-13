@@ -17,7 +17,7 @@ import pandas as pd
 import os
 import itertools
 
-from imabeh.run.tasks import Task, task_collection
+from imabeh.run.tasks import Task, task_collection, pipeline_dict
 
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 
@@ -126,7 +126,7 @@ class TaskManager():
         self.torun_table = pd.DataFrame(columns=header)
 
         # read the text file and get the list of flies/trials/tasks to process
-        fly_dicts = self._read_fly_dirs(self.txt_file_to_process) 
+        fly_dicts = self._read_fly_dirs(self.txt_file_to_process, log) 
 
         # fill with new toruns from the fly_dicts
         # checks that fly dirs exist and that tasks are valid (in task_collection) - log if not
@@ -209,22 +209,32 @@ class TaskManager():
         log.add_line_to_log("\n-------TASK MANAGER FINISHED-------")
 
         
-    ## SUPPORTING FUNCTIONS - for create_torun_table
+    ## SUPPORTING FUNCTIONS - for create_torun_table [_read_fly_dirs]
 
-    def _read_fly_dirs(self, txt_file: str) -> List[dict]:
+    def _read_fly_dirs(self, txt_file: str, log) -> List[dict]:
         """
         reads the supplied text file and returns a list of dictionaries with information for each fly trial to process.
         USED ONLY ONCE AT START (.__init__)
 
         General requested format of a line in the txt file: fly_dir||trial1,trial2||task1,task2,!task3
-        ! before a task forces an overwrite.
         example (see _user_and_fly_dirs_to_process_example.txt for more):
-        date_genotype/Fly1||001_beh,002_beh||fictrac,!df3d
+        date_genotype/Fly1||001_beh,002_beh||fictrac,df3d
+
+        Modifications:
+            instead of the full trial name, the begginning of the trial name is enough (usually the trial number)
+            'all' instead of the trial name will fetch all trials in the fly dir (unless excluded using e-)
+            k- before a trial indicates trial keyword (all trials with that keyword will be included, unless excluded using e-)
+            e- before a trial name (or start of name) indicates this trial will be excluded
+
+            ! before a task forces an overwrite.
+            p- before a task indicates pipeline (a preset set of tasks)
 
         Parameters
         ----------
         txt_file : str, optional
             location of the text file
+        log: logManager
+            to log any issues with the trials/pipelines, exclusions...
 
         Returns
         -------
@@ -259,7 +269,224 @@ class TaskManager():
                 }
             fly_dicts.append(fly_dict)
 
+        # check that all fly_dirs are real folders - if not, log and remove
+        for f, fly_dict in enumerate(fly_dicts):
+            fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+            if not os.path.isdir(fly_dir):
+                log.add_line_to_log(f"Fly dir '{fly_dir}' does not exist.")
+                fly_dicts[f] = 'ERROR'
+        if 'ERROR' in fly_dicts: fly_dicts.remove('ERROR') 
+
+        # replace pipelines with the tasks they contain
+        # if p-!, add ! in front of all tasks (each will be overwritten)
+        fly_dicts = self._read_pipelines(fly_dicts, log)
+
+        # get all trials if 'all' is present
+        fly_dicts = self._get_all_trials(fly_dicts)
+
+        # get trials based on keyworkds (k-)
+        fly_dicts = self._read_keywords(fly_dicts, log)
+
+        # get full trial names if needed
+        fly_dicts = self._get_full_trial(fly_dicts, log)
+
+        # exclude any specified trials (or starts of trials)
+        fly_dicts = self._exclude_trials
+
+
         return fly_dicts
+
+    def _read_pipelines(self, fly_dicts, log):
+        """ If any task starts with 'p-', replace it with the tasks in the pipeline.
+        The list of preset pipelines is imported from imabeh/run/tasks.py
+
+        If the pipeline is set to be overwritten (p-!), add ! in front of all tasks in the pipeline
+
+        Parameter and Returns
+        ---------------------
+        fly_dicts: List[dict]
+            list of fly_dicts [fly_dir, trials, tasks]
+        log: LogManager
+            to log any wrong pipelines entered
+        """
+        for f, fly_dict in enumerate(fly_dicts):
+            tasks = fly_dict['tasks']
+            for t, task in enumerate(tasks):
+                if task.startswith("p-"):
+                    # get pipeline name and remove ! if present
+                    pipeline = task[2:].replace("!","")
+
+                    # get tasks in pipeline
+                    try:
+                        new_tasks = pipeline_dict[pipeline]
+                    # if pipeline not found in pipeline_dict, log and remove
+                    except KeyError:
+                        log.add_line_to_log(f"Pipeline '{pipeline}' is not defined in pipeline_dict.")
+                        tasks[t] = 'ERROR'
+                        continue
+
+                    # if overwrite (p-!), add ! in front of all tasks
+                    if task.startswith("p-!"):
+                        new_tasks = ["!" + t for t in new_tasks]
+                    
+                    # replace pipeline with new tasks
+                    tasks[t:t+1] = new_tasks  
+                
+            # remove any error pipelines, if any
+            tasks = self._remove_errors(tasks, 'ERROR')
+
+            # add to fly_dicts
+            fly_dicts[f]['tasks'] = tasks
+        
+        return fly_dicts
+
+    def _get_all_trials(self, fly_dicts):
+        """ If any trial is 'all', search the fly_dir and add all folders found as trials 
+
+        Parameter and Returns
+        ---------------------
+        fly_dicts: List[dict]
+            list of fly_dicts [fly_dir, trials, tasks]
+        """
+        for f, fly_dict in enumerate(fly_dicts):
+            trials = fly_dict['trials']
+            for t, trial in enumerate(trials):
+                if trial == 'all':
+                    # get list of folders (trials) within fly_dir and replace 'all' with trials
+                    fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+                    new_trials = [f for f in os.listdir(fly_dir) if os.path.isdir(os.path.join(fly_dir, f))]
+                    trials[t:t+1] = new_trials
+            
+            fly_dicts[f]['trials']
+        
+        return fly_dicts
+    
+    def _read_keywords(self, fly_dicts, log):
+        """ If any trial starts with k-, search the fly_dir and add all folders found as trails 
+        if they contain the keywork that follows.
+
+        Parameter and Returns
+        ---------------------
+        fly_dicts: List[dict]
+            list of fly_dicts [fly_dir, trials, tasks]
+        log: LogManager
+            to log any keyworks that don't match any trials
+        """
+        for f, fly_dict in enumerate(fly_dicts):
+            trials = fly_dict['trials']
+            for t, trial in enumerate(trials):
+                if trial.startswith('k-'):
+                    keyword = trial[2:]
+                    # get list of folders (trials) within fly_dir - but only if they contain the keyword
+                    fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+                    new_trials = [f for f in os.listdir(fly_dir) 
+                              if os.path.isdir(os.path.join(fly_dir, f)) 
+                              and keyword in f
+                              ]
+                    # if not matching trials were found, log
+                    if len(new_trials) == 0:
+                        log.add_line_to_log(f"No trials match keyword '{keyword}' in fly_dir {fly_dir}.")
+                        trials[t] = 'ERROR'
+                    else:
+                        trials[t:t+1] = new_trials
+
+            # remove any errors, if any
+            trials = self._remove_errors(trials, 'ERROR')
+
+            # add back to fly_dict
+            fly_dicts[f]['trials'] = trials
+        
+        return fly_dicts
+
+    def _get_full_trial(self, fly_dicts, log):
+        """ Instaed of full trial names, the start of the name is sufficient.
+        Check whether each trial is a real dir within fly_dir, and if not,
+        search for any folder that starts with the trial given.
+        If no folder matches or more than one is found, log and remove.
+
+        Parameter and Returns
+        ---------------------
+        fly_dicts: List[dict]
+            list of fly_dicts [fly_dir, trials, tasks]
+        log: LogManager
+            to log any mistakes in trials
+        """
+        for f, fly_dict in enumerate(fly_dicts):
+            trials = fly_dict['trials']
+
+            # get list of folders (trials) within fly_dir
+            fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+            real_trials = [f for f in os.listdir(fly_dir) if os.path.isdir(os.path.join(fly_dir, f))]
+
+            for t, trial in enumerate(trials):
+                # check if trial is contained within real_trials (as is not to be excluded)
+                if trial not in real_trials and not trial.startswith('e-'):
+                    # check if any real_trials start with trial
+                    trial_match = [t for t in real_trials if t.startswith(trial)]
+                    # if only one match, replace
+                    if len(trial_match) == 1:
+                        trials[t] = trial_match[0]
+                    # if no matches or more than one, log and remove
+                    else:
+                        log.add_line_to_log(f"Trial {trial} has {len(trial_match)} matches in {fly_dir}.")
+                        trials[t] = 'ERROR'
+            
+             # remove any errors, if any
+            trials = self._remove_errors(trials, 'ERROR')
+
+            # add to fly_dicts
+            fly_dicts[f]['trials'] = trials
+        
+        return fly_dicts
+        
+    def _exclude_trials(self,fly_dicts, log):
+        """ If any trial starts with e-, find match in trial list and remove.
+        If no match (or too many) is found, log and ignore.
+
+        Parameter and Returns
+        ---------------------
+        fly_dicts: List[dict]
+            list of fly_dicts [fly_dir, trials, tasks]
+        log: LogManager
+            to log if trial could not be excluded (not found in fly_dict)
+        """
+        for f, fly_dict in enumerate(fly_dicts):
+            trials = fly_dict['trials']
+            for t, trial in enumerate(trials):
+                if trial.startswith('e-'):
+                    exclude = trial[2:]
+
+                    # find any other matching trials to exclude
+                    match = [t for t in trials if t.startswith(exclude)]
+                    # if no matches are found, ignore
+                    if len(match) == 0:
+                        log.add_line_to_log(f"Excluded trial {exclude} has NO matches in fly_dir {fly_dict['fly_dir']}. IGNORED.")
+                    # otherwise, ignore all matches
+                    else:
+                        trials = ['EXCLUDED' if t.startswith(match[0]) else t for t in trials]
+                        if len(match) > 1:
+                            log.add_line_to_log(f"Excluded trial {exclude} has {len(match)} matches in fly_dir {fly_dict['fly_dir']}. ALL WILL BE EXCLUDED")
+
+                    # remove all e- trials
+                    trials[t] = 'EXCLUDED'
+
+            # remove all EXCLUDED tasks and those that start with -e
+            trials = self._remove_errors(trials, 'EXCLUDED')
+
+            # add to fly_dicts
+            fly_dicts[f]['trials'] = trials
+        
+        return fly_dicts
+    
+    def _remove_errors(any_list: list[str], error: str):
+        for s in reversed(any_list):
+            if s == error:
+                any_list.remove(s)
+        
+        return any_list
+
+
+    ## SUPPORTING FUNCTIONS - for create_torun_table [_add_toruns_from_trial]
 
     def _add_toruns_from_trial(self, trial_dict : dict, log):
         """
