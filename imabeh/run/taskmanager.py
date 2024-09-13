@@ -15,6 +15,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import os
+import itertools
 
 from imabeh.run.tasks import Task, task_collection
 
@@ -94,6 +95,7 @@ class TaskManager():
 
         For each trial in the trials_to_process list:
 
+        checks that the trial dir exists
         checks if tasks exist in task_collection
         checks if tasks have been completed previously. If so, checks if they need to be overwritten.
             if already completed and overwrite = False, log and remove from list of to_run
@@ -166,6 +168,13 @@ class TaskManager():
     def run(self, log) -> None:
         """
         run the tasks manager to sequentially process all toruns from self.torun_dicts.
+
+        The main loop will:
+        - check if there are tasks left to run - if not, finish
+        - check if there are any running tasks (non-python/bash tasks), and if so whether they have finished
+        - check if any tasks are ready to run (all prerequisites met)
+            - if none are ready, wait and check again (again, for non-python/bash tasks)
+            - if any are ready, run the next ready task
         """
         # log the start of the task manager
         log.add_line_to_log("\n-------TASK MANAGER STARTED-------\n")
@@ -173,48 +182,28 @@ class TaskManager():
         # check if there are tasks left to run
         while self.n_toruns:
 
+            # check all prereqs and update status/remove todos
+            for torun_index, torun in self.torun_table.iterrows():
+                self._check_prerequisites(torun, torun_index, log)
+
             # checks all "running" tasks to see if any have finished - correctly (1) or with errors (2)
             # this will only be necessary for tasks that are run outside of python/bash (ex. on the cluster)
-            any_finished = False
             running_tasks = self.torun_table[self.torun_table['status'] == "running"]
-
             if not running_tasks.empty:
-                for _, torun in running_tasks.iterrows():
-                    finished = self._check_task_finished(torun.to_dict())
-
-                    # if any tasks finished correctly (1), remove from table and update flyTable
-                    if finished == 1:
-                        log.add_line_to_log(f"Finished '{torun['task']}' task for trial '{torun['fly_dir']}/{torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
-                        self._remove_torun(torun, log)
-                        self.fly_table.update_trial_task_status(torun, status = 1)
-                        any_finished = True
-
-                    # if any failed (2), remove, update flyTable, and log
-                    elif finished == 2:
-                        log.add_line_to_log(f"Task '{torun['task']}' for fly '{torun['fly_dir']}' trial '{torun['trial']}' FAILED. Removing task.")
-                        self._remove_torun(torun, log)
-                        self.fly_table.update_trial_task_status(torun, status = 2)
-                        any_finished = True
-
-            # if any status changed, check all prereqs and update status/remove todos
-            if any_finished:
-                for torun_index, torun in self.torun_table.iterrows():
-                    self._check_prerequisites(torun, torun_index, log)
-            # if no tasks are left, break and finish
-            if not self.n_toruns:
-                break
+                self._check_running_tasks(running_tasks, log)
 
             # check if any tasks are ready to run
             ready_tasks = self.torun_table[self.torun_table['status'] == "ready"]
+
             # if none are ready, wait and check again
             if ready_tasks.empty:
                 log.add_line_to_log('Waiting...')
                 time.sleep(self.t_wait_s)
+                print(self.torun_table)
 
             # otherwise, run the next ready task
             else:
                 self._execute_next_task(log)
-
 
         # if no tasks are left, log and finish
         log.add_line_to_log("\n-------TASK MANAGER FINISHED-------")
@@ -300,10 +289,9 @@ class TaskManager():
         order = self.torun_table.index.max()
         if np.isnan(order): #(no toruns yet)
             order = -1
-
+            
         # for each trial and task, make a new torun dict (will become a row)
-        for trial_name, task_name in zip(trial_dict["trials"], trial_dict["tasks"]):
-
+        for trial_name, task_name in itertools.product(trial_dict["trials"], trial_dict["tasks"]):
             # create new torun dict
             new_torun = deepcopy(trial_dict)
             new_torun["trial"] = trial_name
@@ -504,11 +492,38 @@ class TaskManager():
 
     # SUPPORTING FUNCTIONS - for run
 
+    def _check_running_tasks(self, running_tasks, log):
+        """
+        check if any currently "running" tasks have finished running
+        only necessary for tasks that are run outside of python/bash (ex. on the cluster)
+        might have to improve whenever a task needs this...
+
+        Parameters
+        ----------
+        running_tasks: pd.DataFrame
+            dataframe with the currently running tasks
+        log: LogManager to log the results
+        """
+        for _, torun in running_tasks.iterrows():
+            finished = self._check_task_finished(torun.to_dict())
+
+            # if any tasks finished correctly (1), remove from table and update flyTable
+            if finished == 1:
+                log.add_line_to_log(f"Finished '{torun['task']}' task for trial '{torun['fly_dir']}/{torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
+                self._remove_torun(torun, log)
+                self.fly_table.update_trial_task_status(torun, status = 1)
+
+            # if any failed (2), remove, update flyTable, and log
+            elif finished == 2:
+                log.add_line_to_log(f"Task '{torun['task']}' for fly '{torun['fly_dir']}' trial '{torun['trial']}' FAILED. Removing task.")
+                self._remove_torun(torun, log)
+                self.fly_table.update_trial_task_status(torun, status = 2)
+
     def _check_task_finished(self, torun_dict: dict) -> int:
         """
         check if a currently "running" task has finished running
+        This is only necessary for tasks that are run outside of python/bash (ex. on the cluster)
         use each task's own test_finished method to determine if the task has finished
-        USED IN THE MAIN LOOP TO CHECK IF TASKS HAVE FINISHED
         """
 
         # get task name
@@ -539,9 +554,26 @@ class TaskManager():
         # set status to running
         self.torun_table.loc[torun_index, "status"] = "running"
 
-        # initialize and run the task - and get the taskstatus_log path back
+        # initialize and run the task
+        # for python tasks, finished = True when successfully finished
+        # for others (like cluster tasks), finished = False and you will need to check later using the _check_task_finished method
         task = self.task_collection[task_name]()
-        taskstatus_log = task.start_run(next_torun.to_dict(), log)
-        # add the taskstatus_log path to the torun_table
-        self.torun_table.loc[torun_index, "taskstatus_log"] = taskstatus_log
+        try:
+            finished, task_log_path = task.start_run(next_torun.to_dict(), log)
+        
+            # add the taskstatus_log path to the torun_table
+            self.torun_table.loc[torun_index, "taskstatus_log"] = task_log_path
+
+            # if task finished correctly, remove from table and update flyTable
+            if finished:
+                log.add_line_to_log(f"Finished '{task_name}' task for trial '{next_torun['fly_dir']}/{next_torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
+                self._remove_torun(next_torun, log)
+                self.fly_table.update_trial_task_status(next_torun, status = 1)
+            # if the task is still running, do nothing here               
+        
+        #if task failed, remove from table, update flyTable, and log
+        except:
+            log.add_line_to_log(f"Task '{task_name}' for fly '{next_torun['fly_dir']}' trial '{next_torun['trial']}' FAILED. Removing task.")
+            self._remove_torun(next_torun, log)
+            self.fly_table.update_trial_task_status(next_torun, status = 2)
 

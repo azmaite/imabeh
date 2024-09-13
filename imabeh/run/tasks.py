@@ -65,7 +65,9 @@ class Task:
 
         Returns
         -------
-        str
+        finished : bool
+            whether the task has finished or not
+        task_log_path : str
             the path to the taskstatus log file
         """
 
@@ -80,6 +82,7 @@ class Task:
         # it can also be used to check if the task has finished for non python/bash tasks
         task_log = LogManager(log_name = f"_task_{self.name}_status")
         task_log.add_line_to_log("running started at " + datetime.now().isoformat(sep=' '))
+        task_log_path = os.path.join(task_log.log_folder,task_log.log_file)
 
         try:
             # RUN TASK!!!
@@ -89,17 +92,19 @@ class Task:
             # (make sure to implement the test_finished method in the Task subclass for these cases!!!!)
             finished = self._run(torun_dict, log)
 
-            # log the correct end of the task - if finished
+            # log the correct end of the task and return the status and path to log file
             if finished:
                 task_log.add_line_to_log("finished successfully at " + time.ctime(time.time()))
+                return True, task_log_path
             else:
-                # return the path to the taskstatus log file
-                return os.path.join(task_log.log_folder,task_log.log_file)
+                task_log.add_line_to_log("task running outside of python/bash at " + time.ctime(time.time()))
+                return False, task_log_path
 
         except Exception as e:
             # log the failure of the task
             task_log.add_line_to_log("failed at " + time.ctime(time.time()))
             task_log.add_line_to_log(f"  Error: {e}")
+            raise RuntimeError(f"Error running {self.name} task: {e}")
 
 
     def _run(self, torun_dict):
@@ -258,7 +263,7 @@ class Df3dTask(Task):
 #         # except Exception as e:
 #           # log.add_line_to_log(f"Error running name: {e}")
 #           # raise e
-#         return True
+#         return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
 
 
 ## END OF TASK DEFINITIONS
