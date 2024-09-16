@@ -4,7 +4,9 @@ TaskManager: class to prioritise and sequentially execute different tasks
 
 contains functions:
     - _create_torun_table: reads the supplied text file and creates the torun_table from the list of trials/tasks to process
-    -
+        (used during initialization of the TaskManager
+    - run: run the tasks manager to sequentially process all toruns from self.torun_dicts
+    
 also contains additional supporting functions
 """
 
@@ -126,11 +128,11 @@ class TaskManager():
         self.torun_table = pd.DataFrame(columns=header)
 
         # read the text file and get the list of flies/trials/tasks to process
+        # all the modifications (pipelines, keywords etc. are processed here)
         fly_dicts = self._read_fly_dirs(self.txt_file_to_process, log) 
 
         # fill with new toruns from the fly_dicts
         # checks that fly dirs exist and that tasks are valid (in task_collection) - log if not
-        # also checks if tasks must be overwritten
         for trial_dict in fly_dicts:
             self._add_toruns_from_trial(trial_dict, log)
 
@@ -146,11 +148,13 @@ class TaskManager():
 
             # check if any tasks have been completed previously (without errors) using the fly table
             table_status = self.fly_table.check_trial_task_status(torun_dict)
+
             # if already completed and overwrite = False, log and remove from list of to_run
             if table_status == 1 and torun.overwrite == False: # 1 = done
                 log.add_line_to_log("Task already completed and will not be overwritten")
                 self._remove_torun(torun_dict, log)
-            # if already completed and overwrite = True, change status in fly_table to 2
+
+            # if already completed and overwrite = True, change status in fly_table to 2 (to allow it to be re-run)
             elif table_status == 1 and torun.overwrite == True: 
                 log.add_line_to_log("Task already completed but will be overwritten")
                 log.add_line_to_log(f"   task '{torun.task}' for fly '{torun.fly_dir}' trial '{torun.trial}'\n")
@@ -209,7 +213,7 @@ class TaskManager():
         log.add_line_to_log("\n-------TASK MANAGER FINISHED-------")
 
         
-    ## SUPPORTING FUNCTIONS - for create_torun_table [_read_fly_dirs]
+    ## SUPPORTING FUNCTIONS - for create_torun_table > _read_fly_dirs
 
     def _read_fly_dirs(self, txt_file: str, log) -> List[dict]:
         """
@@ -250,7 +254,7 @@ class TaskManager():
             lines = file.readlines()
             lines = [line.rstrip() for line in lines]
 
-        # get list of fly trials
+        # get list of fly trials/tasks, splitting tasks and trials strings
         fly_dicts = []
         for line in lines:
             # ignore commented lines
@@ -464,7 +468,7 @@ class TaskManager():
         return fly_dict
 
 
-    ## SUPPORTING FUNCTIONS - for create_torun_table [_add_toruns_from_trial]
+    ## SUPPORTING FUNCTIONS - for create_torun_table > _add_toruns_from_trial
 
     def _add_toruns_from_trial(self, trial_dict : dict, log):
         """

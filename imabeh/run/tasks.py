@@ -94,10 +94,12 @@ class Task:
             # (make sure to implement the test_finished method in the Task subclass for these cases!!!!)
             finished = self._run(torun_dict, log)
 
-            # log the correct end of the task and return the status and path to log file
+            # if finished, return the status and delete the task log file (so return an empty path)
             if finished:
-                task_log.add_line_to_log("finished successfully at " + time.ctime(time.time()))
-                return True, task_log_path
+                os.remove(task_log_path)
+                return True, ''
+            
+            # if kept running, log and return task_log_path
             else:
                 task_log.add_line_to_log("task running outside of python/bash at " + time.ctime(time.time()))
                 return False, task_log_path
