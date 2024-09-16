@@ -32,7 +32,7 @@ from imabeh.run.logmanager import LogManager
 from imabeh.general.main import combine_df
 
 # task specific imports
-from imabeh.imaging2p import utils2p
+from imabeh.imaging2p import utils2p, static2p
 from imabeh.behavior import fictrac, df3d
 from imabeh.general import main
 
@@ -183,6 +183,30 @@ class TifTask(Task):
         utils2p.create_tiffs(torun_dict['full_path'])
         return True
 
+class FlattenTask(Task):
+    """ 
+    Task to flatten a set of Z stacks into a single average, registered STD projection
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "flat"
+        self.prerequisites = ['tif']
+
+    def _run(self, torun_dict, log) -> bool:
+        try:
+            # find tif image for channel_1
+            stack_path = main.find_file(torun_dict['full_path'], "channel_1.tif", "tif")
+            # flatten and save
+            static2p.flatten_stack_std(stack_path)
+
+        except Exception as e:
+          log.add_line_to_log(f"Error running name: {e}")
+          raise e
+    
+        return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
+
+
 
 # Behavior tasks
 
@@ -248,7 +272,7 @@ class Df3dTask(Task):
             raise e
     
         return True
-
+   
 
 # # TEMPLATE FOR NEW TASKS
 # class NameTask(Task):
@@ -261,12 +285,12 @@ class Df3dTask(Task):
 #         self.prerequisites = ['prerequisite_1_taskname', 'prerequisite_2_taskname', ...]
 
 #     def _run(self, torun_dict, log) -> bool:
-#         # try:
+#         try:
 #           # enter functions to run here
 #           # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
-#         # except Exception as e:
-#           # log.add_line_to_log(f"Error running name: {e}")
-#           # raise e
+#         except Exception as e:
+#           log.add_line_to_log(f"Error running name: {e}")
+#           raise e
 #         return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
 
 
@@ -276,10 +300,10 @@ class Df3dTask(Task):
 # add new pipeline sets here as list of task names
 pipeline_dict = {
     "ablation_beh" : ["df", "fictrac", "df3d"],
-    "ablation_stack" : ["tif"],
+    "ablation_stack" : ["tif", "flat"],
     }
 
 
 ## Create the task_collection dictionary automatically
 # dict format: {task_name: TaskClass}
-task_collection = {cls().name: cls for cls in Task.__subclasses__()}#
+task_collection = {cls().name: cls for cls in Task.__subclasses__()}
