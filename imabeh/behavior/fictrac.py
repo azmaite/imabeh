@@ -75,7 +75,8 @@ def config_and_run_fictrac(trial_dir):
         absolute directory pointing to a trial directory.
     """
     # get video file name from user_config
-    video_file = main.find_file(trial_dir, f"camera_{CAMERA_NUM}.mp4", file_type="video")
+    images_dir = os.path.join(trial_dir, 'behData/images')
+    video_file = main.find_file(images_dir, f"camera_{CAMERA_NUM}.mp4", file_type="video")
     # get the fictrac output directory from user_config and trial_dir
     output_dir = os.path.join(trial_dir, user_config['fictrac_path'])
     # check if dir already exists. If not, create it
@@ -456,8 +457,8 @@ def _get_septacam_fps(trial_dir):
     f_s : int
         frame rate of the septacam as given by the metadata file
     """   
-
-    cam_metadata_file = main.find_seven_camera_metadata_file(trial_dir)
+    images_dir = os.path.join(trial_dir, 'behData/images')
+    cam_metadata_file = main.find_seven_camera_metadata_file(images_dir)
     metadata = json.load(open(cam_metadata_file))
     f_s = metadata['FPS']
 
@@ -503,7 +504,8 @@ def get_fictrac_df(trial_dir, med_filt_size=5, sigma_gauss_size=10):
     f_s = _get_septacam_fps(trial_dir)
 
     # find the most recent fictrac output file
-    fictrac_output = find_fictrac_file(trial_dir, camera=CAMERA_NUM, most_recent=True)
+    fictrac_dir = os.path.join(trial_dir, user_config['fictrac_path'])
+    fictrac_output = find_fictrac_file(fictrac_dir, camera=CAMERA_NUM, most_recent=True)
     # read the data
     fictrac_df = pd.read_csv(fictrac_output, header=None, names=COL_NAMES)
     

@@ -104,7 +104,8 @@ def postprocess_df3d_trial(trial_dir):
         directory of the trial. should contain an "images" folder at some level of hierarchy
     """
     # get the path to the (most recent) df3d result file
-    pose_result = find_df3d_file(trial_dir, 'result', most_recent=True)
+    df3d_dir = os.path.join(trial_dir, user_config["df3d_path"])
+    pose_result = find_df3d_file(df3d_dir, 'result', most_recent=True)
     pose_result_name = "df3d_result"
 
     # run df3d post-processing
@@ -138,9 +139,10 @@ def get_df3d_df(trial_dir):
         Path to df3d dataframe containing pose estimation data
     """
     # get the path to the most recent df3d result file as well as aligned and angles files
-    df3d_result = find_df3d_file(trial_dir, 'result', most_recent=True)
-    df3d_angles = find_df3d_file(trial_dir, 'angles', most_recent=True)
-    df3d_aligned = find_df3d_file(trial_dir, 'aligned', most_recent=True)
+    df3d_dir = os.path.join(trial_dir, user_config["df3d_path"])
+    df3d_result = find_df3d_file(df3d_dir, 'result', most_recent=True)
+    df3d_angles = find_df3d_file(df3d_dir, 'angles', most_recent=True)
+    df3d_aligned = find_df3d_file(df3d_dir, 'aligned', most_recent=True)
 
     # read the angles and joit positions and convert naming to final format
     # currently one dictionary per leg/region with subdictionary for each angle/position
