@@ -193,14 +193,14 @@ class DfTask(Task):
 
         # add fictrac dataframe if present
         try:
-            fictrac_df_path = main.find_file(torun_dict['full_path'], "fictrac_df.pks", "fictrac df")
+            fictrac_df_path = main.find_file(torun_dict['full_path'], "fictrac_df.pkl", "fictrac df")
             combine_df(torun_dict['full_path'], fictrac_df_path, log)
         except FileNotFoundError:
             log.add_line_to_log("No fictrac dataframe found")
 
         # add df3d dataframe if present
         try:
-            df3d_df_path = main.find_file(torun_dict['full_path'], "df3d_df.pks", "df3d df")
+            df3d_df_path = main.find_file(torun_dict['full_path'], "df3d_df.pkl", "df3d df")
             combine_df(torun_dict['full_path'], df3d_df_path, log)
         except FileNotFoundError:
             log.add_line_to_log("No df3d dataframe found")
