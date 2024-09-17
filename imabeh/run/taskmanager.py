@@ -297,7 +297,7 @@ class TaskManager():
             fly_dict = self._get_full_trial(fly_dict, log)
 
             # exclude any specified trials (or starts of trials)
-            fly_dict = self._exclude_trials
+            fly_dict = self._exclude_trials(fly_dict, log)
 
             # replace in fly_dicts
             fly_dicts[f] = fly_dict
@@ -343,26 +343,25 @@ class TaskManager():
         fly_dict['tasks'] = tasks
         return fly_dict
 
-    def _get_all_trials(self, fly_dicts):
+    def _get_all_trials(self, fly_dict):
         """ If any trial is 'all', search the fly_dir and add all folders found as trials 
 
         Parameter and Returns
         ---------------------
-        fly_dicts: List[dict]
-            list of fly_dicts [fly_dir, trials, tasks]
+        fly_dict: dict 
+            dict containing fly_dir, trials, tasks
         """
-        for f, fly_dict in enumerate(fly_dicts):
-            trials = fly_dict['trials']
-            for t, trial in enumerate(trials):
-                if trial == 'all':
-                    # get list of folders (trials) within fly_dir and replace 'all' with trials
-                    fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
-                    new_trials = [f for f in os.listdir(fly_dir) if os.path.isdir(os.path.join(fly_dir, f))]
-                    trials[t:t+1] = new_trials
-            
-            fly_dicts[f]['trials']
+        trials = fly_dict['trials']
+        for t, trial in enumerate(trials):
+            if trial == 'all':
+                # get list of folders (trials) within fly_dir and replace 'all' with trials
+                fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
+                new_trials = [f for f in os.listdir(fly_dir) if os.path.isdir(os.path.join(fly_dir, f))]
+                trials[t:t+1] = new_trials
         
-        return fly_dicts
+        fly_dict['trials'] = trials
+        
+        return fly_dict
     
     def _read_keywords(self, fly_dict, log):
         """ If any trial starts with k-, search the fly_dir and add all folders found as trails 
@@ -493,7 +492,6 @@ class TaskManager():
         -------
             new rows in self.torun_table, one for each task in the trial_dict
         """
-
         # get last torun order in table
         order = self.torun_table.index.max()
         if np.isnan(order): #(no toruns yet)

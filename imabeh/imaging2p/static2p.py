@@ -50,7 +50,6 @@ def flatten_stack_std(stack_path : str):
     del(stack)
 
     # register each projected stack to the first
-    # pip install pystackreg!!!!!!!!
     sr = StackReg(StackReg.RIGID_BODY)
     stack_reg = sr.register_transform_stack(stack_project, reference='previous')
     del(stack_project)
