@@ -132,40 +132,6 @@ class Task:
 ## ALL TASKS DEFINED BELOW
 ## ----------------------------------------------- ##
 
-# Test tasks
-
-class TestTask1(Task):
-    """ Useless task for testing purposes.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.name = "test1"
-        self.prerequisites = []
-
-    def _run(self, torun_dict, log) -> bool:
-        # RUN TASK!!!
-        print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
-        time.sleep(2)
-        print(f"    {self.name} task done")
-        return True
-
-class TestTask2(Task):
-    """ Useless task 2 for testing purposes.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.name = "test2"
-        self.prerequisites = ['test1']
-
-    def _run(self, torun_dict, log) -> bool:
-        # RUN TASK!!!
-        print(f"    Running {self.name} task on {os.path.join(torun_dict['fly_dir'], torun_dict['trial'])}")
-        time.sleep(2)
-        print(f"    {self.name} task 2 done")
-        return True
-
 # Imaging tasks
 
 class TifTask(Task):
@@ -213,7 +179,7 @@ class FlattenTask(Task):
 class DfTask(Task):
     """ 
     Task create a general behavior dataframe with info from Thorsync.
-    Df3d and fictrac dataframes will be combined with this dataframe.
+    Df3d and fictrac dataframes will be combined with this dataframe if present.
     This also gets the info on optogenetic stimulation from the thorsync file.
     """
     def __init__(self):
@@ -222,25 +188,39 @@ class DfTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
+        # make the main dataframe
         main.get_sync_df(torun_dict['full_path'])
+
+        # add fictrac dataframe if present
+        try:
+            fictrac_df_path = main.find_file(torun_dict['full_path'], "fictrac_df.pks", "fictrac df")
+            combine_df(torun_dict['full_path'], fictrac_df_path, log)
+        except FileNotFoundError:
+            log.add_line_to_log("No fictrac dataframe found")
+
+        # add df3d dataframe if present
+        try:
+            df3d_df_path = main.find_file(torun_dict['full_path'], "df3d_df.pks", "df3d df")
+            combine_df(torun_dict['full_path'], df3d_df_path, log)
+        except FileNotFoundError:
+            log.add_line_to_log("No df3d dataframe found")
+
         return True
 
 class FictracTask(Task):
     """ 
-    Task to run fictrac to track the ball movement and save the results in the main processed dataframe.
+    Task to run fictrac to track the ball movement and convert output to df.
     """
     def __init__(self):
         super().__init__()
         self.name = "fictrac"
-        self.prerequisites = ["df"]
+        self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
         try:
             # run fictrac and convert output to df
             fictrac.config_and_run_fictrac(torun_dict['full_path'])
-            fictract_df_path = fictrac.get_fictrac_df(torun_dict['full_path'])
-            # combine the fictrac df with the main processed df
-            combine_df(torun_dict['full_path'], fictract_df_path, log)
+            _ = fictrac.get_fictrac_df(torun_dict['full_path'])
         except Exception as e:
             log.add_line_to_log(f"Error running fictrac: {e}")
             raise e
@@ -250,12 +230,12 @@ class FictracTask(Task):
 class Df3dTask(Task):
     """ 
     Task to run pose estimation using DeepFly3D and Df3d post processing
-    and save results in behaviour dataframe.
+    and convert output to dataframe.
     """
     def __init__(self):
         super().__init__()
         self.name = "df3d"
-        self.prerequisites = ["df"]
+        self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
         trial_dir = torun_dict['full_path']
@@ -263,9 +243,7 @@ class Df3dTask(Task):
             # run df3d, postprocess and get df
             df3d.run_df3d(trial_dir)
             df3d.postprocess_df3d_trial(trial_dir)
-            df3d_df_path = df3d.get_df3d_df(trial_dir)
-            # combine the df3d df with the main processed df
-            combine_df(trial_dir, df3d_df_path, log)
+            _ = df3d.get_df3d_df(trial_dir)
 
         except Exception as e:
             log.add_line_to_log(f"Error running df3d: {e}")
