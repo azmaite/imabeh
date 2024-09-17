@@ -218,7 +218,7 @@ def get_sync_df(trial_dir):
         os.makedirs(main_df_path)
     main_df_file = os.path.join(main_df_path, "processed_df.pkl")
     # save the dataframe
-    sync_df.to_csv(main_df_file, index=False)
+    sync_df.to_pickle(main_df_file)
 
     return sync_df
 
@@ -311,13 +311,11 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
         main_df.attrs[key] = new_df.attrs[key]
 
     # save the main dataframe
-    print(main_df_path)
-    main_df.to_csv(main_df_path, index=False)
+    main_df.to_pickle(main_df_path)
 
 def read_main_df(trial_dir):
     # get default main_df_path from trial_dir and user_config
     main_df_path = os.path.join(trial_dir, user_config["processed_path"], "processed_df.pkl")
-    print(main_df_path)
     # read the new dataframe (.pkl)
     main_df = pd.read_pickle(main_df_path)
 
