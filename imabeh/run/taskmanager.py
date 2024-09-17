@@ -152,7 +152,7 @@ class TaskManager():
             # if already completed and overwrite = False, log and remove from list of to_run
             if table_status == 1 and torun.overwrite == False: # 1 = done
                 log.add_line_to_log("Task already completed and will not be overwritten")
-                self._remove_torun(torun_dict, log)
+                self._remove_torun(torun_dict)
 
             # if already completed and overwrite = True, change status in fly_table to 2 (to allow it to be re-run)
             elif table_status == 1 and torun.overwrite == True: 
@@ -567,7 +567,7 @@ class TaskManager():
             # return index
             return row.index
     
-    def _remove_torun(self, torun_dict : dict, log: LogManager):
+    def _remove_torun(self, torun_dict : dict):
         """
         function to remove a torun row from the self.torun_table
         USED AT START IF TASK HAS BEEN COMPLETED PREVIOUSLY AND OVERWRITE = FALSE
@@ -580,7 +580,6 @@ class TaskManager():
             - "fly_dir": the base directory of the fly
             - "trial": which trial to run on
             - "task": the name of the task to run
-            log: LogManager to log the removal
         Generates
         -------
             removes the row from self.torun_table
@@ -592,9 +591,7 @@ class TaskManager():
         # remove row
         self.torun_table = self.torun_table.drop(torun_index)
 
-        # log removal
-        log.add_line_to_log(f"   Removed task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' from torun_table.\n")
-
+        
     def _check_duplicates(self, log: LogManager):
         """ 
         function to check for duplicates in the torun_table and remove them
@@ -677,14 +674,14 @@ class TaskManager():
                 # if missing, remove the task and log
                 if prereq_index is None:
                     log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is missing. Removing task.")
-                    self._remove_torun(torun_dict, log)
+                    self._remove_torun(torun_dict)
                     all_prereqs_present = False
                     break
 
                 # if present, check if it is before the task. If not, remove
                 elif prereq_index > torun_index:
                     log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is after the task. Removing task.")
-                    self._remove_torun(torun_dict, log)
+                    self._remove_torun(torun_dict)
                     all_prereqs_present = False 
                     break
 
@@ -717,13 +714,13 @@ class TaskManager():
             # if any tasks finished correctly (1), remove from table and update flyTable
             if finished == 1:
                 log.add_line_to_log(f"Finished '{torun['task']}' task for trial '{torun['fly_dir']}/{torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
-                self._remove_torun(torun, log)
+                self._remove_torun(torun)
                 self.fly_table.update_trial_task_status(torun, status = 1)
 
             # if any failed (2), remove, update flyTable, and log
             elif finished == 2:
                 log.add_line_to_log(f"Task '{torun['task']}' for fly '{torun['fly_dir']}' trial '{torun['trial']}' FAILED. Removing task.")
-                self._remove_torun(torun, log)
+                self._remove_torun(torun)
                 self.fly_table.update_trial_task_status(torun, status = 2)
 
     def _check_task_finished(self, torun_dict: dict) -> int:
@@ -774,13 +771,13 @@ class TaskManager():
             # if task finished correctly, remove from table and update flyTable
             if finished:
                 log.add_line_to_log(f"Finished '{task_name}' task for trial '{next_torun['fly_dir']}/{next_torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
-                self._remove_torun(next_torun, log)
+                self._remove_torun(next_torun)
                 self.fly_table.update_trial_task_status(next_torun, status = 1)
             # if the task is still running, do nothing here               
         
         #if task failed, remove from table, update flyTable, and log
         except:
             log.add_line_to_log(f"Task '{task_name}' for fly '{next_torun['fly_dir']}' trial '{next_torun['trial']}' FAILED. Removing task.")
-            self._remove_torun(next_torun, log)
+            self._remove_torun(next_torun)
             self.fly_table.update_trial_task_status(next_torun, status = 2)
 

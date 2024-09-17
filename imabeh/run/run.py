@@ -27,7 +27,7 @@ def main() -> None:
     # log start of processing and list of tasks to do
     log.add_line_to_log("Will start task manager with the following tasks:")
     for _, torun in task_manager.torun_table.iterrows():
-        log.add_line_to_log(f"   {torun.task}: {torun.fly_dir} / {torun.trial}")
+        log.add_line_to_log("%-*s - %s" % (40, f"{torun.fly_dir} / {torun.trial}",torun.task))
 
     # run task manager
     task_manager.run(log)
