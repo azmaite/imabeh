@@ -40,13 +40,24 @@ def run_df3d(trial_dir : str):
         "df3d-cli",         # The name of the command
         "-vv",              
         "-o", images_dir,  
-        "--output-folder", output_dir,
+        "--output-folder", 'temp',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
         "--order", *map(str, camera_ids)
     ]
     # Call the df3d main function to run
     # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
     # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
     df3dcli()
+
+    # Move the output files to the correct output directory
+    output_dir_temp = os.path.join(images_dir, 'temp')
+    for file in os.listdir(output_dir_temp):
+        os.rename(os.path.join(output_dir_temp, file), os.path.join(output_dir, file))
+    os.rmdir(output_dir_temp)
+
+    # Delete all camera jpgs
+    for file in os.listdir(images_dir):
+        if file.endswith(".jpg"):
+            os.remove(file)
 
 
 def find_df3d_file(directory, type : str = 'result', most_recent=False):
