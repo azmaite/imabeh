@@ -1007,54 +1007,6 @@ def get_processed_lines(sync_file,
 
     return processed_lines
 
-
-def _get_appropriate_lines_SLOW(sync_file):
-    """ Function to get the relevant lines from the sync file,
-    depending on the version of ThorSync and the microscope used.
-    
-    Parameters
-    ----------
-    sync_file : str
-        Path to the synchronization file.
-    
-    Returns
-    -------
-    processed_lines : dict
-        Dictionary with all relevant lines.
-    """
-    # initialize dictionary
-    processed_lines = {}
-
-    # get scope from user_config
-    scope = user_config['scope']
-
-    # get line names that depend on scope
-    if scope == '2p_1':
-        line_names_scope = ["CO2_Stim", "Basler"]
-    elif scope == '2p_2':
-        line_names_scope = ['CO2', 'Cameras']
-
-    # try loading lines - if fail, use old version of line names (Thorsync version)
-    line_names = ["CaptureOn", "FrameCounter"] + line_names_scope
-    try:
-        (
-            processed_lines["Capture On"], 
-            processed_lines["Frame Counter"], 
-            processed_lines["CO2"], 
-            processed_lines["Cameras"]
-        ) = get_lines_from_sync_file(sync_file, line_names)
-    except:
-        line_names = ["Capture On", "Frame Counter"] + line_names_scope
-        (
-            processed_lines["Capture On"], 
-            processed_lines["Frame Counter"], 
-            processed_lines["CO2"], 
-            processed_lines["Cameras"]
-        ) = get_lines_from_sync_file(sync_file, line_names)
-
-    return processed_lines
-
-
 def _get_appropriate_lines(sync_file):
     """ Function to get the relevant lines from the sync file,
     depending on the version of ThorSync and the microscope used.
@@ -1080,24 +1032,24 @@ def _get_appropriate_lines(sync_file):
 
     # get line names that depend on scope - and their location within the sync file
     if scope == '2p_1':
-        lines_scope = {"CO2": ["TEMP","CO2_Stim"], "Cameras":["TEMP","Basler"]}
+        lines_scope = {"CO2": ["DI","CO2_Stim"], "Cameras":["DI","Basler"]}
     elif scope == '2p_2':
-        lines_scope = {"CO2": ["TEMP","CO2"], "Cameras":["TEMP","Cameras"]}
+        lines_scope = {"CO2": ["DI","CO2"], "Cameras":["DI","Cameras"]}
     # load lines
     with h5py.File(sync_file, "r") as f:
         for name, (line_type, line_name) in lines_scope.items():
-            processed_lines[name] = f[line_type][line_name][:].squeeze()[0]
+            processed_lines[name] = f[line_type][line_name][:].squeeze()
 
     # try loading other lines - if fail, use old version of line names (Thorsync version)
-    lines = {"CaptureOn": ["TEMP","CaptureOn"], "FrameCounter":["TEMP","FrameCounter"]}
+    lines = {"CaptureOn": ["DI","CaptureOn"], "FrameCounter":["CI","FrameCounter"]}
     with h5py.File(sync_file, "r") as f:
         try:
             for name, (line_type, line_name) in lines.items():
-                processed_lines[name] = f[line_type][line_name][:].squeeze()[0]
+                processed_lines[name] = f[line_type][line_name][:].squeeze()
         except:
-            lines = {"CaptureOn": ["TEMP","Capture On"], "FrameCounter":["TEMP","Frame Counter"]}
+            lines = {"CaptureOn": ["DI","Capture On"], "FrameCounter":["CI","Frame Counter"]}
             for name, (line_type, line_name) in lines.items():
-                processed_lines[name] = f[line_type][line_name][:].squeeze()[0]
+                processed_lines[name] = f[line_type][line_name][:].squeeze()
 
     return processed_lines
 
