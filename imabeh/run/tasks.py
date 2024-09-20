@@ -188,24 +188,30 @@ class DfTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
-        # make the main dataframe
-        main.get_sync_df(torun_dict['full_path'])
+        # check if the main dataframe is already present, and create if not
+        main_df_path = os.path.join(torun_dict['full_path'], user_config["processed_path"], "processed_df.pkl")
+        if not os.path.exists(main_df_path):
+            main.get_sync_df(torun_dict['full_path'])
 
         # add fictrac dataframe if present
         try:
-            fictrac_dir = os.path.join(torun_dict['full_path'], user_config['fictrac_dir'])
+            fictrac_dir = os.path.join(torun_dict['full_path'], user_config['fictrac_path'])
             fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
             combine_df(torun_dict['full_path'], fictrac_df_path, log)
         except FileNotFoundError:
             log.add_line_to_log("No fictrac dataframe found")
+        except Exception as e:
+            log.add_line_to_log(f"Error combining fictrac dataframe: {e}")
 
         # add df3d dataframe if present
         try:
-            df3d_dir = os.path.join(torun_dict['full_path'], user_config['df3d_dir'])
+            df3d_dir = os.path.join(torun_dict['full_path'], user_config['df3d_path'])
             df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
             combine_df(torun_dict['full_path'], df3d_df_path, log)
         except FileNotFoundError:
             log.add_line_to_log("No df3d dataframe found")
+        except Exception as e:
+            log.add_line_to_log(f"Error combining df3d dataframe: {e}")
 
         return True
 
@@ -279,7 +285,8 @@ class Df3dTask(Task):
 ## PIPELINES
 # add new pipeline sets here as list of task names
 pipeline_dict = {
-    "ablation_beh" : ["df", "fictrac", "df3d"],
+    "test" : ["tif", "df"],
+    "ablation_beh" : ["fictrac", "df3d", "df"],
     "ablation_stack" : ["tif", "flat"],
     }
 

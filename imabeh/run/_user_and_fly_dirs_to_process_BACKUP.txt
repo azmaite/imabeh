@@ -1,0 +1,19 @@
+# current user of the processing pipelines and
+# fly dirs to be selected for preprocessing and which tasks to run on them
+# see more examples and details in _user_and_fly_dirs_to_process_examples.txt
+
+## Current user of the processing pipelines
+# must match existing dictionary in 'run/userpaths.py'
+
+CURRENT_USER = USER_MA_2p2
+
+## Files to process and tasks
+# General format:
+# experiment_path/Fly#||trial1,trial2,trial3||task1,task2,task3
+# for more examples and details see _user_and_fly_dirs_to_process_examples.txt
+
+
+240210_T-2_Test/Fly3||all,e-005_error||p-stack,fictrac
+
+
+

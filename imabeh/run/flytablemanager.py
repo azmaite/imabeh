@@ -104,6 +104,8 @@ class FlyTableManager():
 
     def _save_fly_table(self):
         """ Save the fly processing status table to the csv file path. 
+        also save a backup.
+
         Parameters
         ----------
         self.table_folder : str
@@ -111,11 +113,13 @@ class FlyTableManager():
         self.fly_table : pandas.DataFrame
         """
 
-        # get the path for the fly processing table
+        # get the path for the fly processing table (and the backup)
         table_path = os.path.join(self.table_folder, self.table_file)
+        backup_path = os.path.join(self.table_folder, self.table_file.replace(".csv", "_backup.csv"))
 
         # save the dataframe to a csv file
         self.fly_table.to_csv(table_path, index=False)
+        self.fly_table.to_csv(backup_path, index=False)
 
 
     def _get_fly_table(self):
@@ -286,7 +290,7 @@ class FlyTableManager():
     def update_trial_task_status(self, single_trial: dict, status: int, log: LogManager = None):
         """ Update the status of a fly trial and task in the fly processing table.
         If the fly or task don't yet exist in the table, add them.
-        Saves the table.
+        Saves the table (and a backup!)
 
         Parameters
         ----------
@@ -309,5 +313,6 @@ class FlyTableManager():
         # update the status of the task for the fly trial
         self.fly_table.loc[fly_index, single_trial['task']] = status
 
-        # save the table
+        # save the table and a backup
         self._save_fly_table()
+

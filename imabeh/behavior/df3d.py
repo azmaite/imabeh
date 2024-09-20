@@ -49,6 +49,11 @@ def run_df3d(trial_dir : str):
     df3dcli()
 
     # Move the output files to the correct output directory
+    output_dir = os.path.join(trial_dir, output_dir)
+    try:
+        os.makedirs(output_dir)
+    except:
+        pass
     output_dir_temp = os.path.join(images_dir, 'temp')
     for file in os.listdir(output_dir_temp):
         os.rename(os.path.join(output_dir_temp, file), os.path.join(output_dir, file))
@@ -57,7 +62,7 @@ def run_df3d(trial_dir : str):
     # Delete all camera jpgs
     for file in os.listdir(images_dir):
         if file.endswith(".jpg"):
-            os.remove(file)
+            os.remove(os.path.join(images_dir, file))
 
 
 def find_df3d_file(directory, type : str = 'result', most_recent=False):
@@ -175,10 +180,11 @@ def get_df3d_df(trial_dir):
     # for each joint, iterate through x,y,z too
     for leg in leg_keys:
         joint_keys = [key for key in joints[leg].keys()]
-        for joint, (i_xyz, xyz) in zip(joint_keys, enumerate(["x", "y", "z"])):
-            new_name = "joint" + leg + "_" + joint + "_" + xyz
-            new_vals = np.array(joints[leg][joint]["raw_pos_aligned"][:, i_xyz])
-            df3d_dict[new_name] = new_vals
+        for joint in joint_keys:
+            for i_xyz, xyz in enumerate(["x", "y", "z"]):
+                new_name = "joint" + leg + "_" + joint + "_" + xyz
+                new_vals = np.array(joints[leg][joint]["raw_pos_aligned"][:, i_xyz])
+                df3d_dict[new_name] = new_vals
 
     # get the abdomen positions from df3d result file
     with open(df3d_result, "rb") as f:
@@ -187,10 +193,11 @@ def get_df3d_df(trial_dir):
     abdomen_keys = ["RStripe1", "RStripe2", "RStripe3", "LStripe1", "LStripe2", "LStripe3"]
     abdomen_inds = [df3d_skeleton.index(key) for key in abdomen_keys]
     # add abdomen positions with proper names and number format to df3d_dict
-    for i_abd, abd_key, (i_xyz, xyz) in zip(abdomen_inds, abdomen_keys, enumerate(["x", "y", "z"])):
-        new_name = "joint_Abd_" + abd_key + "_" + xyz
-        new_vals = np.array(pose["points3d"][:, i_abd, i_xyz])
-        df3d_dict[new_name] = new_vals
+    for i_abd, abd_key in enumerate(abdomen_keys):
+        for i_xyz, xyz in enumerate(["x", "y", "z"]):
+            new_name = "joint_Abd_" + abd_key + "_" + xyz
+            new_vals = np.array(pose["points3d"][:, i_abd, i_xyz])
+            df3d_dict[new_name] = new_vals
 
     # create a dataframe with all the data
     df3d_df = pd.DataFrame(df3d_dict)

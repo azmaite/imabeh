@@ -151,13 +151,12 @@ class TaskManager():
 
             # if already completed and overwrite = False, log and remove from list of to_run
             if table_status == 1 and torun.overwrite == False: # 1 = done
-                log.add_line_to_log("Task already completed and will not be overwritten")
+                log.add_line_to_log(f"Task already completed and will NOT be overwritten - remove: '{torun.task}' for fly '{torun.fly_dir}' trial '{torun.trial}'")
                 self._remove_torun(torun_dict)
 
             # if already completed and overwrite = True, change status in fly_table to 2 (to allow it to be re-run)
             elif table_status == 1 and torun.overwrite == True: 
-                log.add_line_to_log("Task already completed but will be overwritten")
-                log.add_line_to_log(f"   task '{torun.task}' for fly '{torun.fly_dir}' trial '{torun.trial}'\n")
+                log.add_line_to_log(f"Task already completed but will be overwritten: '{torun.task}' for fly '{torun.fly_dir}' trial '{torun.trial}'")
                 self.fly_table.update_trial_task_status(torun_dict, status = 2)
         
         # iterate over toruns to check pre-requisites for each task and set statuses acordingly
@@ -281,7 +280,8 @@ class TaskManager():
             fly_dir = os.path.join(user_config["labserver_data"],fly_dict['fly_dir'])
             if not os.path.isdir(fly_dir):
                 log.add_line_to_log(f"Fly dir '{fly_dir}' does not exist.")
-                fly_dicts.pop[f]
+                fly_dicts.pop(f)
+                continue
 
             # replace pipelines with the tasks they contain
             # if p-!, add ! in front of all tasks (each will be overwritten)
@@ -511,18 +511,19 @@ class TaskManager():
                 log.add_line_to_log(f"Fly directory {new_torun['full_path']} does not exist.")
                 break
 
-            # check that task exists in task_collection - if not, move on to next task
-            if task_name not in self.task_collection.keys():
-                log.add_line_to_log(f"Task '{task_name}' is not defined in task_collection.")
-                continue
-
             # check if tasks must be overwritten
             if task_name.startswith("!"):
-                new_torun["task"] = task_name[1:]
+                task_name = task_name[1:]
+                new_torun["task"] = task_name
                 new_torun["overwrite"] = True
             else:
                 new_torun["task"] = task_name
                 new_torun["overwrite"] = False
+
+            # check that task exists in task_collection - if not, move on to next task
+            if task_name not in self.task_collection.keys():
+                log.add_line_to_log(f"Task '{task_name}' is not defined in task_collection.")
+                continue
 
             # set status to ready (default) and taskstatus_log to None
             new_torun["status"] = "ready"
@@ -674,6 +675,7 @@ class TaskManager():
                 # if missing, remove the task and log
                 if prereq_index is None:
                     log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is missing. Removing task.")
+                    log.add_line_to_log("\n")
                     self._remove_torun(torun_dict)
                     all_prereqs_present = False
                     break
@@ -681,6 +683,7 @@ class TaskManager():
                 # if present, check if it is before the task. If not, remove
                 elif prereq_index > torun_index:
                     log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is after the task. Removing task.")
+                    log.add_line_to_log("\n")
                     self._remove_torun(torun_dict)
                     all_prereqs_present = False 
                     break
@@ -713,13 +716,15 @@ class TaskManager():
 
             # if any tasks finished correctly (1), remove from table and update flyTable
             if finished == 1:
-                log.add_line_to_log(f"Finished '{torun['task']}' task for trial '{torun['fly_dir']}/{torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
+                log.add_line_to_log(f"   Finished '{torun['task']}' task for trial '{torun['fly_dir']}/{torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
+                log.add_line_to_log("\n")
                 self._remove_torun(torun)
                 self.fly_table.update_trial_task_status(torun, status = 1)
 
             # if any failed (2), remove, update flyTable, and log
             elif finished == 2:
-                log.add_line_to_log(f"Task '{torun['task']}' for fly '{torun['fly_dir']}' trial '{torun['trial']}' FAILED. Removing task.")
+                log.add_line_to_log(f"TASK '{torun['task']}' FOR FLY '{torun['fly_dir']}' TRIAL '{torun['trial']}' FAILED. Removing task.")
+                log.add_line_to_log("\n")
                 self._remove_torun(torun)
                 self.fly_table.update_trial_task_status(torun, status = 2)
 
@@ -770,14 +775,15 @@ class TaskManager():
 
             # if task finished correctly, remove from table and update flyTable
             if finished:
-                log.add_line_to_log(f"Finished '{task_name}' task for trial '{next_torun['fly_dir']}/{next_torun['trial']}' @ {datetime.now().isoformat(sep=' ')}")
+                log.add_line_to_log(f"   Finished @ {datetime.now().isoformat(sep=' ')}\n")
                 self._remove_torun(next_torun)
                 self.fly_table.update_trial_task_status(next_torun, status = 1)
             # if the task is still running, do nothing here               
         
         #if task failed, remove from table, update flyTable, and log
         except:
-            log.add_line_to_log(f"Task '{task_name}' for fly '{next_torun['fly_dir']}' trial '{next_torun['trial']}' FAILED. Removing task.")
+            log.add_line_to_log(f"--TASK '{task_name}' FOR FLY '{next_torun['fly_dir']}' TRIAL '{next_torun['trial']}' FAILED. Removing task.")
+            log.add_line_to_log("\n")
             self._remove_torun(next_torun)
             self.fly_table.update_trial_task_status(next_torun, status = 2)
 

@@ -576,19 +576,18 @@ def get_processed_lines(sync_file,
     # if imaging present, process lines
     if metadata_2p_file is not None:
         metadata_2p = utils2p.Metadata(metadata_2p_file)
-        processed_lines["Frame Counter"] = process_frame_counter(
-            processed_lines["Frame Counter"], metadata_2p)
+        processed_lines["FrameCounter"] = process_frame_counter(
+            processed_lines["FrameCounter"], metadata_2p)
 
     # process opto line
     processed_lines["CO2"] = process_stimulus_line(processed_lines["CO2"])
-
 
     # Make sure the clipping start just before the
     # acquisition of the first frame
     # (only if there is imaging)
     if metadata_2p_file is not None:
-        mask = np.logical_and(processed_lines["Capture On"],
-                            processed_lines["Frame Counter"] >= 0)
+        mask = np.logical_and(processed_lines["CaptureOn"],
+                            processed_lines["FrameCounter"] >= 0)
         indices = np.where(mask)[0]
         mask[max(0, indices[0] - 1)] = True
 
@@ -600,7 +599,7 @@ def get_processed_lines(sync_file,
     # Get times of ThorSync ticks
     metadata = SyncMetadata(sync_metadata_file)
     freq = metadata.get_freq()
-    times = get_times(len(processed_lines["Frame Counter"]), freq)
+    times = get_times(len(processed_lines["FrameCounter"]), freq)
     processed_lines["Times"] = times
 
     return processed_lines

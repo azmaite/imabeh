@@ -17,9 +17,9 @@ import importlib
 
 LOCAL_DIR, _ = os.path.split(os.path.realpath(__file__))
 
-# location of the labserver files and data paths
+# Global paths that are the same for all users
 GLOBAL_PATHS = {
-    "labserver_files": "/mnt/upramdya_files",
+    # location of the labserver data path
     "labserver_data": "/mnt/upramdya_data",
 
     # location of the txt file that specifies the current user and the list of fly_dirs to process
@@ -72,7 +72,6 @@ SCOPE_CONFIG = {
 
 USER_EXAMPLE_2p2 = {
     "initials": "EX_2p1",
-    "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "EXAMPLE_User", "Experimental_data", "2P"),
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "EX"),
 
     # which scope you're using
@@ -83,16 +82,21 @@ USER_EXAMPLE_2p2 = {
     "opto_cam": 2,
 }
 
+# user for testing purposes
+USER_TEST = {
+    "initials": "TEST",
+    "labserver_data": os.path.join(os.path.dirname(LOCAL_DIR), "tests"),
+    "scope": "2p_2",
+}
+
 USER_MA_2p2 = {
     "initials": "MA_2p2",
-    "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "AZCORRA_Maite", "Experimental_data", "2P"),
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
     "scope": "2p_2",
 }
 
 USER_MA_scape = {
     "initials": "MA_scape",
-    "labserver_files": os.path.join(GLOBAL_PATHS["labserver_files"], "AZCORRA_Maite", "Experimental_data", "2P"),
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
     "scope": "scape",
 }

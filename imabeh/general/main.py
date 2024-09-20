@@ -207,7 +207,7 @@ def get_sync_df(trial_dir):
 
         # if ALSO imaging - add 2p frames in relation to behavior frames:
         if metadata_2p_file is not None:
-            scope = processed_lines['Frame Counter']
+            scope = processed_lines['FrameCounter']
             scope_idx = scope[cam_idx]
             sync_df["2p_frames"] = scope_idx.astype(int)
 
@@ -277,20 +277,18 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     """
     # get default main_df_path from trial_dir and user_config
     main_df_path = os.path.join(trial_dir, user_config["processed_path"], "processed_df.pkl")
-    # if folder of main_df_path does not exist, create it
-    if not os.path.isdir(os.path.dirname(main_df_path)):
-        os.makedirs(os.path.dirname(main_df_path))
+
+    # if main_df does not exist, create it
+    if not os.path.isfile(main_df_path):
+        get_sync_df(trial_dir)
+        log.add_line_to_log("  Main processing dataframe created - should've existed?")
+
+    # read the main dataframe (.pkl)
+    main_df = pd.read_pickle(main_df_path)
+
 
     # read the new dataframe (.pkl)
     new_df = pd.read_pickle(new_df_path)
-
-    # check if main df exists - if not, create use using get_sync_df
-    if not os.path.isfile(main_df_path):
-        main_df = get_sync_df(trial_dir)
-        # log that the main dataframe was created
-        log.add_line_to_log("  Main processing dataframe created at {}".format(main_df_path))
-    else:
-        main_df = pd.read_csv(main_df_path)
     
 
     # check that both df have the same length (number of frames)
@@ -299,16 +297,19 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
             raise ValueError("Number of frames in main and new df do not match. \n"+\
                 "Main_df has {} ticks, new_df has {} lines. \n".format(len(main_df), len(new_df))+\
                 "Trial: "+ trial_dir)
+        
     # add new to main_df
+    keys_to_add = []
     for key in list(new_df.keys()):
         # check if key aready exists in main_df. If so, log (and replace)
         if key in list(main_df.keys()):
             log.add_line_to_log("  Replacing key {} in main processing dataframe at {}".format(key, main_df_path))
-        main_df[key] = new_df[key].values
+        keys_to_add.append(key)
+    main_df = pd.concat([main_df, new_df[keys_to_add]], axis=1)
 
     # combine atributes too, if any!
-    for key in list(new_df.attrs.keys()):
-        main_df.attrs[key] = new_df.attrs[key]
+    attrs_to_add = {key: new_df.attrs[key] for key in new_df.attrs.keys()}
+    main_df.attrs.update(attrs_to_add)
 
     # save the main dataframe
     main_df.to_pickle(main_df_path)
