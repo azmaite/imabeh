@@ -580,7 +580,7 @@ def get_processed_lines(sync_file,
             processed_lines["FrameCounter"], metadata_2p)
 
     # process opto line
-    processed_lines["CO2"] = process_stimulus_line(processed_lines["CO2"])
+    processed_lines["opto_stim"] = process_stimulus_line(processed_lines["opto_stim"])
 
     # Make sure the clipping start just before the
     # acquisition of the first frame
@@ -629,9 +629,9 @@ def _get_appropriate_lines(sync_file):
 
     # get line names that depend on scope - and their location within the sync file
     if scope == '2p_1':
-        lines_scope = {"CO2": ["DI","CO2_Stim"], "Cameras":["DI","Basler"]}
+        lines_scope = {"opto_stim": ["DI","CO2_Stim"], "Cameras":["DI","Basler"]}
     elif scope == '2p_2':
-        lines_scope = {"CO2": ["DI","CO2"], "Cameras":["DI","Cameras"]}
+        lines_scope = {"opto_stim": ["DI","LightSheetLaserOn"], "Cameras":["DI","Cameras"]}
     # load lines
     with h5py.File(sync_file, "r") as f:
         for name, (line_type, line_name) in lines_scope.items():

@@ -210,6 +210,9 @@ def get_sync_df(trial_dir):
             scope = processed_lines['FrameCounter']
             scope_idx = scope[cam_idx]
             sync_df["2p_frames"] = scope_idx.astype(int)
+    
+    # add opto too
+    sync_df["opto_stim"] = processed_lines['opto_stim'][cam_idx].astype(int)
 
     # get default main_df_path from trial_dir and user_config
     # check that dir exists, if not create it
