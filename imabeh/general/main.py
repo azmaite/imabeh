@@ -303,12 +303,18 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
         
     # add new to main_df
     keys_to_add = []
+    replaced_keys = False
     for key in list(new_df.keys()):
         # check if key aready exists in main_df. If so, log (and replace)
         if key in list(main_df.keys()):
-            log.add_line_to_log("  Replacing key {} in main processing dataframe at {}".format(key, main_df_path))
+            replaced_keys = True
+            # remove the key from main_df
+            main_df = main_df.drop(key, axis=1)
         keys_to_add.append(key)
     main_df = pd.concat([main_df, new_df[keys_to_add]], axis=1)
+    # lof if replaced
+    if replaced_keys:
+        log.add_line_to_log(f"  Replaced duplicate keys in main processing dataframe at {main_df_path}")
 
     # combine atributes too, if any!
     attrs_to_add = {key: new_df.attrs[key] for key in new_df.attrs.keys()}
