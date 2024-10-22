@@ -440,6 +440,29 @@ def find_raw_file(directory):
         return _find_file(directory,
                         "Image_001_001.raw",
                         "raw")
+    
+def find_tif_file(directory, channel_num : int = 1):
+    """
+    This function finds the path to the tif file obtained using the 
+    create_tiffs function and returns it.
+    By default it returns the tif file for channel 1.
+
+    Parameters
+    ----------
+    directory : str
+        Directory in which to search.
+    channel_num : int, optional
+        Channel number for which to find the tif file. Default is 1.
+
+    Returns
+    -------
+    path : str
+        Path to raw file.
+    """
+   
+    return _find_file(directory,
+                        f"channel_{str(channel_num)}.tif",
+                        "tif")
 
 def find_metadata_file(directory):
     """

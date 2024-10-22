@@ -4,6 +4,7 @@ For example, a z stack of a neuron with 3 replicates.
 
 Includes functions:
     flatten_stack() - converts a set of repeat Z-stacks into a single average projection image
+    
 """
 
 import numpy as np
@@ -23,6 +24,7 @@ def flatten_stack_std(stack_path : str):
     - register each projection using StackReg
     - gets an average image of the registered projections
     - saves the final image (add _STD to the file name)
+    If only 3D image is provided (x,y,time), it will get a STD projection across time only.
 
     Parameters
     ----------
@@ -40,29 +42,43 @@ def flatten_stack_std(stack_path : str):
     else:
         raise ValueError('stack_file path is not a valid file')
 
-    # check correct dimensions
-    if not len(stack.shape) == 4:
+    # if 4D - std projection across z then average across time
+    if len(stack.shape) == 4:
+        # get std projection across z (better than max projection)
+        stack_project = np.memmap.std(stack,1)
+        # delete stack to save memory
+        del(stack)
+
+        # register each projected stack to the first
+        sr = StackReg(StackReg.RIGID_BODY)
+        stack_reg = sr.register_transform_stack(stack_project, reference='previous')
+        del(stack_project)
+
+        # get average across projected stacks
+        stack_avg = np.memmap.mean(stack_reg,0)
+        del(stack_reg)
+
+        # save stack - add _STD to name
+        name, ext = os.path.splitext(stack_path) 
+        save_path = name + '_STD' + ext
+        utils2p.save_img(save_path, stack_avg)
+
+    # if 3D, then std projection across time only
+    elif len(stack.shape) == 3:
+        # get std projection across time (better than average)
+        stack_avg = np.memmap.std(stack,1)
+        # delete stack to save memory
+        del(stack)
+
+    # if other dimensions, raise error
+    else:
         raise ValueError('stack file must have 4 dimensions')
 
-    # get std projection across z (better than max projection)
-    stack_project = np.memmap.std(stack,1)
-    # delete stack to save memory
-    del(stack)
 
-    # register each projected stack to the first
-    sr = StackReg(StackReg.RIGID_BODY)
-    stack_reg = sr.register_transform_stack(stack_project, reference='previous')
-    del(stack_project)
-
-    # get average across projected stacks
-    stack_avg = np.memmap.mean(stack_reg,0)
-    del(stack_reg)
-
-    # save stack - add _STD to name
+    # save stack as tif - add _STD to name
     name, ext = os.path.splitext(stack_path) 
     save_path = name + '_STD' + ext
     utils2p.save_img(save_path, stack_avg)
-
 
 
 
