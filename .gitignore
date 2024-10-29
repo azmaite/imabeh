@@ -5,6 +5,7 @@ tmp/
 testing.ipynb
 logs/
 _fly_dirs_to_process.txt
+240912_test-dataset/
 
 .gittoken
 

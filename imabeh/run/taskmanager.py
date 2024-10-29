@@ -318,6 +318,7 @@ class TaskManager():
             to log any wrong pipelines entered
         """
         tasks = fly_dict['tasks']
+        print(pipeline_dict)
         for t, task in reversed(list(enumerate(tasks))): # reverse order so elements can be removed without affecting the loop
             if task.startswith("p-"):
                 # get pipeline name and remove ! if present
@@ -325,6 +326,7 @@ class TaskManager():
 
                 # get tasks in pipeline
                 try:
+                    print(pipeline)
                     new_tasks = pipeline_dict[pipeline]
                 # if pipeline not found in pipeline_dict, log and remove
                 except KeyError:
@@ -447,6 +449,9 @@ class TaskManager():
             if trial.startswith('e-'):
                 exclude = trial[2:]
 
+                # remove e- trial itself
+                trials.pop(t)
+
                 # find any other matching trials to exclude
                 match = [t for t in trials if t.startswith(exclude)]
                 # if no matches are found, ignore
@@ -458,9 +463,6 @@ class TaskManager():
                     # warn in log if more than one match
                     if len(match) > 1:
                         log.add_line_to_log(f"Excluded trial {exclude} has {len(match)} matches in fly_dir {fly_dict['fly_dir']}. ALL WILL BE EXCLUDED")
-
-                # remove e- trial itself
-                trials.pop(t)
 
         # add to fly_dict and return
         fly_dict['trials'] = trials
