@@ -188,10 +188,12 @@ class DfTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
-        # check if the main dataframe is already present, and create if not
+        # check if the main dataframe is already present
+        # if yes, delete and create. If not, create it
         main_df_path = os.path.join(torun_dict['full_path'], user_config["processed_path"], "processed_df.pkl")
-        if not os.path.exists(main_df_path):
-            main.get_sync_df(torun_dict['full_path'])
+        if os.path.exists(main_df_path):
+            os.remove(main_df_path)
+        main.get_sync_df(torun_dict['full_path'])
 
         # add fictrac dataframe if present
         try:
