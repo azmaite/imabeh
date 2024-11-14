@@ -318,7 +318,6 @@ class TaskManager():
             to log any wrong pipelines entered
         """
         tasks = fly_dict['tasks']
-        print(pipeline_dict)
         for t, task in reversed(list(enumerate(tasks))): # reverse order so elements can be removed without affecting the loop
             if task.startswith("p-"):
                 # get pipeline name and remove ! if present
@@ -326,7 +325,6 @@ class TaskManager():
 
                 # get tasks in pipeline
                 try:
-                    print(pipeline)
                     new_tasks = pipeline_dict[pipeline]
                 # if pipeline not found in pipeline_dict, log and remove
                 except KeyError:
