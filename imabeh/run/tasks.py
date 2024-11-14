@@ -33,7 +33,7 @@ from imabeh.general.main import combine_df
 
 # task specific imports
 from imabeh.imaging2p import utils2p, static2p
-from imabeh.behavior import fictrac, df3d
+from imabeh.behavior import fictrac, df3d, sleap
 from imabeh.general import main
 
 
@@ -145,8 +145,14 @@ class TifTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
-        # convert raw to tiff
-        utils2p.create_tiffs(torun_dict['full_path'])
+        try:
+            # convert raw to tiff
+            utils2p.create_tiffs(torun_dict['full_path'])
+
+        except Exception as e:
+          log.add_line_to_log(f"Error running {self.name}: {e}")
+          raise e
+        
         return True
 
 class FlattenTask(Task):
@@ -167,10 +173,10 @@ class FlattenTask(Task):
             static2p.flatten_stack_std(stack_path)
 
         except Exception as e:
-          log.add_line_to_log(f"Error running name: {e}")
+          log.add_line_to_log(f"Error running {self.name}: {e}")
           raise e
     
-        return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
+        return True
 
 
 
@@ -179,7 +185,7 @@ class FlattenTask(Task):
 class DfTask(Task):
     """ 
     Task create a general behavior dataframe with info from Thorsync.
-    Df3d and fictrac dataframes will be combined with this dataframe if present.
+    Df3d, fictrac, and sleap dataframes will be combined with this dataframe if present.
     This also gets the info on optogenetic stimulation from the thorsync file.
     """
     def __init__(self):
@@ -215,6 +221,16 @@ class DfTask(Task):
         except Exception as e:
             log.add_line_to_log(f"Error combining df3d dataframe: {e}")
 
+        # add sleap dataframe if present
+        try:
+            sleap_dir = os.path.join(torun_dict['full_path'], 'behData/sleap')
+            sleap_df_path = main.find_file(sleap_dir, "sleap_df.pkl", "sleap df")
+            combine_df(torun_dict['full_path'], df3d_df_path, log)
+        except FileNotFoundError:
+            log.add_line_to_log("No df3d dataframe found")
+        except Exception as e:
+            log.add_line_to_log(f"Error combining df3d dataframe: {e}")
+
         return True
 
 class FictracTask(Task):
@@ -232,7 +248,7 @@ class FictracTask(Task):
             fictrac.config_and_run_fictrac(torun_dict['full_path'])
             _ = fictrac.get_fictrac_df(torun_dict['full_path'])
         except Exception as e:
-            log.add_line_to_log(f"Error running fictrac: {e}")
+            log.add_line_to_log(f"Error running {self.name}: {e}")
             raise e
         
         return True
@@ -256,11 +272,33 @@ class Df3dTask(Task):
             _ = df3d.get_df3d_df(trial_dir)
 
         except Exception as e:
-            log.add_line_to_log(f"Error running df3d: {e}")
+            log.add_line_to_log(f"Error running {self.name}: {e}")
             raise e
     
         return True
    
+class SleapTask(Task):
+    """ Enter task description here.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "sleap"
+        self.prerequisites = []
+
+    def _run(self, torun_dict, log) -> bool:
+        trial_dir = torun_dict['full_path']
+        try:
+            sleap.run_sleap(trial_dir, camera_num='5')
+            sleap.make_sleap_df(trial_dir)
+
+        except Exception as e:
+            log.add_line_to_log(f"Error running {self.name}: {e}")
+            raise e
+        
+        return True
+
+
 
 # # TEMPLATE FOR NEW TASKS
 # class NameTask(Task):
@@ -274,11 +312,11 @@ class Df3dTask(Task):
 
 #     def _run(self, torun_dict, log) -> bool:
 #         try:
-#           # enter functions to run here
-#           # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
+#             # enter functions to run here
+#             # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
 #         except Exception as e:
-#           log.add_line_to_log(f"Error running name: {e}")
-#           raise e
+#             log.add_line_to_log(f"Error running {self.name}: {e}")
+#             raise e
 #         return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
 
 

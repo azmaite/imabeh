@@ -289,11 +289,9 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     # read the main dataframe (.pkl)
     main_df = pd.read_pickle(main_df_path)
 
-
     # read the new dataframe (.pkl)
     new_df = pd.read_pickle(new_df_path)
     
-
     # check that both df have the same length (number of frames)
     if len(main_df) != len(new_df):
         if np.abs(len(main_df) - len(new_df)) <=10:
@@ -317,8 +315,8 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
         log.add_line_to_log(f"  Replaced duplicate keys in main processing dataframe at {main_df_path}")
 
     # combine atributes too, if any!
-    attrs_to_add = {key: new_df.attrs[key] for key in new_df.attrs.keys()}
-    main_df.attrs.update(attrs_to_add)
+    if new_df.attrs:
+        main_df.attrs.update(new_df.attrs)
 
     # save the main dataframe
     main_df.to_pickle(main_df_path)
