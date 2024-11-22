@@ -35,6 +35,7 @@ def make_video_grid(trial_dir, camera_num):
     # add the padding
     onsets = (onsets - pad*hz).astype(int)
     offsets = (offsets + pad*hz).astype(int)
+    dur = np.median(offsets - onsets).astype(int)
 
     # Define output video properties
     output_video_path = os.path.join(trial_dir, "processed", f"camera_{camera_num}_grid.mp4")
@@ -54,7 +55,7 @@ def make_video_grid(trial_dir, camera_num):
         sections.append(section_frames)
 
     # Generate the grid video
-    for i in range(median_dur):
+    for i in range(dur):
         grid_frames = []
         for j in range(3):
             row_frames = [cv2.resize(sections[j * 3 + k][i], (width, height)) for k in range(3)]
