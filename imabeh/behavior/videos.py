@@ -61,6 +61,11 @@ def make_video_grid(trial_dir, camera_num):
             row_frames = [cv2.resize(sections[j * 3 + k][i], (width, height)) for k in range(3)]
             grid_frames.append(np.hstack(row_frames))
         grid_frame = np.vstack(grid_frames)
+
+        # Add a red circle in the top-left corner between stimulation onset and offset
+        if pad*hz <= i < median_dur + pad*hz:
+            cv2.circle(grid_frame, (90, 90), 75, (0, 0, 255), -1)
+
         out.write(grid_frame)
     
     # Release resources
