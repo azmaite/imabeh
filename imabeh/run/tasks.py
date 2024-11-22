@@ -33,7 +33,7 @@ from imabeh.general.main import combine_df
 
 # task specific imports
 from imabeh.imaging2p import utils2p, static2p
-from imabeh.behavior import fictrac, df3d, sleap
+from imabeh.behavior import fictrac, df3d, sleap, videos
 from imabeh.general import main
 
 
@@ -224,10 +224,10 @@ class DfTask(Task):
         # add sleap dataframe if present
         try:
             sleap_dir = os.path.join(torun_dict['full_path'], 'behData/sleap')
-            sleap_df_path = main.find_file(sleap_dir, "sleap_df.pkl", "sleap df")
-            combine_df(torun_dict['full_path'], df3d_df_path, log)
+            sleap_df_path = sleap_dir + "/sleap_df.pkl"
+            combine_df(torun_dict['full_path'], sleap_df_path, log)
         except FileNotFoundError:
-            log.add_line_to_log("No df3d dataframe found")
+            pass
         except Exception as e:
             log.add_line_to_log(f"Error combining df3d dataframe: {e}")
 
@@ -297,6 +297,28 @@ class SleapTask(Task):
             raise e
         
         return True
+    
+
+class GridTask(Task):
+    """ Creates a 3x3 video grid of all stimulations.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "grid"
+        self.prerequisites = []
+
+    def _run(self, torun_dict, log) -> bool:
+        try:
+            camera_num = 5
+            trial_dir = torun_dict['full_path']
+            videos.make_video_grid(trial_dir, camera_num)
+
+        except Exception as e:
+            log.add_line_to_log(f"Error running {self.name}: {e}")
+            raise e
+        return True 
+
 
 
 
@@ -326,7 +348,7 @@ class SleapTask(Task):
 # add new pipeline sets here as list of task names
 pipeline_dict = {
     "test" : ["tif", "df"],
-    "ablation_beh" : ["fictrac", "df3d", "df"],
+    "ablation_beh" : ["grid", "df3d", "fictrac", "df"],
     "ablation_stack" : ["tif", "flat"],
     }
 
