@@ -306,7 +306,7 @@ class GridTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "grid"
-        self.prerequisites = []
+        self.prerequisites = ['df']
 
     def _run(self, torun_dict, log) -> bool:
         try:
