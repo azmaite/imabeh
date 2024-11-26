@@ -87,18 +87,21 @@ USER_TEST = {
     "initials": "TEST",
     "labserver_data": os.path.join(os.path.dirname(LOCAL_DIR), "tests"),
     "scope": "2p_2",
+    "local_data": os.path.join(os.path.dirname(LOCAL_DIR), "tests-df3d"),
 }
 
 USER_MA_2p2 = {
     "initials": "MA_2p2",
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
     "scope": "2p_2",
+    "local_data": "/home/azcorra/Data_downloaded/df3d_local",
 }
 
 USER_MA_scape = {
     "initials": "MA_scape",
     "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
     "scope": "scape",
+    "local_data": "/home/azcorra/Data_downloaded/df3d_local",
 }
 
 

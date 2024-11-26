@@ -18,10 +18,12 @@ from df3dPostProcessing.df3dPostProcessing import df3dPostProcess, df3d_skeleton
 from imabeh.run.userpaths import user_config, LOCAL_DIR
 
 from imabeh.general.main import find_file
-
+   
 
 def run_df3d(trial_dir : str):
-    """run deepfly3d
+    """run deepfly3d.
+    To make it faster to run, the images are copied to a local folder and df3d is run on the local folder.
+    The results are then moved to the correct output directory, and the local folder is deleted.
 
     Parameters
     ----------
@@ -30,17 +32,24 @@ def run_df3d(trial_dir : str):
         df3d will be saved within this trial folder as specified in the user_config
     """
 
-    # Get the output_dir and camera_ids from user_config as well as the images_dir
+    # Prepare the data for df3d by copying the images to the local data folder
+    # this will make it faster to run df3d
+    _prepare_df3d(trial_dir)
+
+    # Get the output_dir and camera_ids from user_config
     output_dir = user_config["df3d_path"]
     camera_ids = user_config["camera_order"]
-    images_dir = os.path.join(trial_dir, "behData", "images")
+    # get the local folder where the images were copied to
+    images_dir = os.path.join(user_config["local_data"], *trial_dir.split(os.sep)[-3:], "images")
+    print("here")
+    print(images_dir)
 
     # Simulate the command-line arguments
     sys.argv = [
         "df3d-cli",         # The name of the command
         "-vv",              
         "-o", images_dir,  
-        "--output-folder", 'temp',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
+        "--output-folder", 'df3d',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
         "--order", *map(str, camera_ids)
     ]
     # Call the df3d main function to run
@@ -59,10 +68,13 @@ def run_df3d(trial_dir : str):
         os.rename(os.path.join(output_dir_temp, file), os.path.join(output_dir, file))
     os.rmdir(output_dir_temp)
 
-    # Delete all camera jpgs
-    for file in os.listdir(images_dir):
-        if file.endswith(".jpg"):
-            os.remove(os.path.join(images_dir, file))
+    # delete all jpgs
+    os.system(f"rm {images_dir}/*.jpg")
+
+    # Delete the local data folder created to save the images (images included)
+    os.system(f"rm -r {images_dir}")
+    # delete any empty flders in the local data folder
+    os.system(f"find {LOCAL_DIR} -type d -empty -delete")
 
 
 def find_df3d_file(directory, type : str = 'result', most_recent=False):
@@ -208,3 +220,29 @@ def get_df3d_df(trial_dir):
     df3d_df.to_pickle(df_out_dir)
     
     return df_out_dir
+
+
+## Helper functions
+
+def _prepare_df3d(trial_dir : str):
+    """ prepare to run df3d by copying the videos from the server to the local machine
+    
+    Parameters
+    ----------
+    trial_dir : str
+        directory of the trial. should contain "behData/images" folder
+        df3d will be saved within this trial folder as specified in the user_config
+    
+    """
+    # get the path to the local data folder to copy videos to (and create if doesn't exist)
+    local_data = user_config["local_data"]
+    os.makedirs(local_data, exist_ok=True)
+
+    # get the path to the images folder
+    images_dir = os.path.join(trial_dir, "behData", "images")
+
+    # create a temporary folder to save the images within local data folder
+    new_folder = os.path.join(*trial_dir.split(os.sep)[-3:])
+    local_data_folder = os.path.join(local_data, new_folder)
+    os.makedirs(local_data_folder, exist_ok=True)
+    os.system(f"cp -r {images_dir} {local_data_folder}")
