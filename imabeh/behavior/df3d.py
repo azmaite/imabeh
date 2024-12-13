@@ -9,6 +9,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import sys
+import time
 
 # IMPORT FUNCTIONS FROM df3d (deepfly3d package) and df3dPostProcessing
 from df3d.cli import main as df3dcli
@@ -41,15 +42,13 @@ def run_df3d(trial_dir : str):
     camera_ids = user_config["camera_order"]
     # get the local folder where the images were copied to
     images_dir = os.path.join(user_config["local_data"], *trial_dir.split(os.sep)[-3:], "images")
-    print("here")
-    print(images_dir)
 
     # Simulate the command-line arguments
+    output_dir_name = 'df3d'
     sys.argv = [
-        "df3d-cli",         # The name of the command
-        "-vv",              
+        "df3d-cli",         # The name of the command           
         "-o", images_dir,  
-        "--output-folder", 'df3d',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
+        "--output-folder", output_dir_name,  # Temporary folder to save the results (df3d cannot save outside of images_dir)
         "--order", *map(str, camera_ids)
     ]
     # Call the df3d main function to run
@@ -63,18 +62,19 @@ def run_df3d(trial_dir : str):
         os.makedirs(output_dir)
     except:
         pass
-    output_dir_temp = os.path.join(images_dir, 'temp')
+    output_dir_temp = os.path.join(images_dir, output_dir_name)
     for file in os.listdir(output_dir_temp):
-        os.rename(os.path.join(output_dir_temp, file), os.path.join(output_dir, file))
+        os.system(f"mv {os.path.join(output_dir_temp, file)} {output_dir}")
     os.rmdir(output_dir_temp)
 
     # delete all jpgs
-    os.system(f"rm {images_dir}/*.jpg")
-
-    # Delete the local data folder created to save the images (images included)
-    os.system(f"rm -r {images_dir}")
-    # delete any empty flders in the local data folder
-    os.system(f"find {LOCAL_DIR} -type d -empty -delete")
+    for file in os.listdir(images_dir):
+        if file.endswith('.jpg'):
+            os.system('rm ' + os.path.join(images_dir, file))
+    
+    # Delete the local data folder created to save the videos
+    exp_dir = os.path.join(user_config["local_data"], *trial_dir.split(os.sep)[-3:-2])
+    os.system(f"rm -r {exp_dir}")
 
 
 def find_df3d_file(directory, type : str = 'result', most_recent=False):
@@ -220,6 +220,34 @@ def get_df3d_df(trial_dir):
     df3d_df.to_pickle(df_out_dir)
     
     return df_out_dir
+
+
+def video_df3d(trial_dir):
+    """ Create a short video of the pose estimation results from df3d
+    superimposed on the original video."""
+
+    # Get the output_dir and camera_ids from user_config
+    output_dir = user_config["df3d_path"]
+    camera_ids = user_config["camera_order"]
+    # get the local folder where the images were copied to
+    images_dir = os.path.join(trial_dir, "behData", "images")
+
+    # Simulate the command-line arguments
+    sys.argv = [
+        "df3d-cli",         # The name of the command           
+        "-o", images_dir,  
+        "--output-folder", 'df3d',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
+        "--order", *map(str, camera_ids),
+        "--video-3d",               # Generate pose3d videos
+        "-n 100",                   # Number of frames to generate videos for
+        "--skip-pose-estimation"    # Skip pose estimation (already done)
+    ]
+    print("frames used = 100")
+    # Call the df3d main function to run
+    # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
+    # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
+    df3dcli()
+
 
 
 ## Helper functions
