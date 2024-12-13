@@ -9,7 +9,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import sys
-import time
+import datetime
 
 # IMPORT FUNCTIONS FROM df3d (deepfly3d package) and df3dPostProcessing
 from df3d.cli import main as df3dcli
@@ -49,12 +49,31 @@ def run_df3d(trial_dir : str):
         "df3d-cli",         # The name of the command           
         "-o", images_dir,  
         "--output-folder", output_dir_name,  # Temporary folder to save the results (df3d cannot save outside of images_dir)
-        "--order", *map(str, camera_ids)
+        "--order", *map(str, camera_ids),
+        "--video-3d",               # Generate pose3d videos
+        "-n 100",                   # Number of frames to generate videos for
     ]
     # Call the df3d main function to run
     # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
     # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
     df3dcli()
+
+    # Make 2d-videos! only for first 100 frames (takes a while)
+    n = 100
+    # print time
+    print('making videos at time = ', datetime.datetime.now())
+    print(f"frames used = {n}")
+    sys.argv = [
+        "df3d-cli",         # The name of the command           
+        "-o", images_dir,  
+        "--output-folder", 'df3d',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
+        "--order", *map(str, camera_ids),
+        "--video-2d",               # Generate pose3d videos
+        "-n", str(n),                   # Number of frames to generate videos for
+        "--skip-pose-estimation"    # Skip pose estimation (already done)
+    ]
+    df3dcli()
+    print('done making videos at time = ', datetime.datetime.now())
 
     # Move the output files to the correct output directory
     output_dir = os.path.join(trial_dir, output_dir)
@@ -72,7 +91,7 @@ def run_df3d(trial_dir : str):
         if file.endswith('.jpg'):
             os.system('rm ' + os.path.join(images_dir, file))
     
-    # Delete the local data folder created to save the videos
+    # Delete the local data folder created to save the videos (with all the contents)
     exp_dir = os.path.join(user_config["local_data"], *trial_dir.split(os.sep)[-3:-2])
     os.system(f"rm -r {exp_dir}")
 
