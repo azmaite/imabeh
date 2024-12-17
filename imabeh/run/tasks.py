@@ -77,37 +77,31 @@ class Task:
         trial_path = os.path.join(torun_dict['fly_dir'], torun_dict['trial'])
         
         # log the start of the task in general log
-        log.add_line_to_log(f"Starting {self.name} task for trial {trial_path} @ {datetime.now().isoformat(sep=' ')}")
+        log.add_line_to_log(f"{trial_path} - {self.name} start @ {datetime.now().isoformat(sep=' ')}, ")
 
-        # log that the task is running into the taskstatus log file (create a new log)
-        # this will keep detailed information about the task in case of failure, including errors
-        # it can also be used to check if the task has finished for non python/bash tasks
-        task_log = LogManager(log_name = f"_task_{self.name}_status")
-        task_log.add_line_to_log("running started at " + datetime.now().isoformat(sep=' '))
-        task_log_path = os.path.join(task_log.log_folder,task_log.log_file)
 
         try:
             # RUN TASK!!!
             # for tasks run in python/bash, when the script runs to the end, it will return finished = True
             # for taks run elsewhere (ex. the cluster), it will return finished = False. In this case,
-            # the taskstatus log file will be used to check if the task has finished
-            # (make sure to implement the test_finished method in the Task subclass for these cases!!!!)
+            # make sure to implement the test_finished method in the Task subclass!!!!
             finished = self._run(torun_dict, log)
 
-            # if finished, return the status and delete the task log file (so return an empty path)
+            # if finished, return the status and update the general log
             if finished:
-                os.remove(task_log_path)
-                return True, ''
+                log.add_line_to_log(f"end @ {datetime.now().isoformat(sep=' ')} \n")
+                return True
             
-            # if kept running, log and return task_log_path
+            # if still running, log and return task_log_path
             else:
-                task_log.add_line_to_log("task running outside of python/bash at " + time.ctime(time.time()))
-                return False, task_log_path
+                log.add_line_to_log(f"running... \n")
+                return False
 
         except Exception as e:
-            # log the failure of the task
-            task_log.add_line_to_log("failed at " + time.ctime(time.time()))
-            task_log.add_line_to_log(f"  Error: {e}")
+            # log the failure of the task in general log
+            log.add_line_to_log(f"FAILED @ {datetime.now().isoformat(sep=' ')} \n")
+            log.add_line_to_log(f"......... Error: {e} \n")
+            log.add_line_to_log(f"\n")
             raise RuntimeError(f"Error running {self.name} task: {e}")
 
 
@@ -150,7 +144,6 @@ class TifTask(Task):
             utils2p.create_tiffs(torun_dict['full_path'])
 
         except Exception as e:
-          log.add_line_to_log(f"Error running {self.name}: {e}")
           raise e
         
         return True
@@ -173,7 +166,6 @@ class FlattenTask(Task):
             static2p.flatten_stack_std(stack_path)
 
         except Exception as e:
-          log.add_line_to_log(f"Error running {self.name}: {e}")
           raise e
     
         return True
@@ -207,9 +199,9 @@ class DfTask(Task):
             fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
             combine_df(torun_dict['full_path'], fictrac_df_path, log)
         except FileNotFoundError:
-            log.add_line_to_log("No fictrac dataframe found")
+            log.add_line_to_log("\n   No fictrac dataframe found \n")
         except Exception as e:
-            log.add_line_to_log(f"Error combining fictrac dataframe: {e}")
+            log.add_line_to_log(f"\n   Error combining fictrac dataframe: {e} \n")
 
         # add df3d dataframe if present
         try:
@@ -217,9 +209,9 @@ class DfTask(Task):
             df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
             combine_df(torun_dict['full_path'], df3d_df_path, log)
         except FileNotFoundError:
-            log.add_line_to_log("No df3d dataframe found")
+            log.add_line_to_log("\n   No df3d dataframe found \n")
         except Exception as e:
-            log.add_line_to_log(f"Error combining df3d dataframe: {e}")
+            log.add_line_to_log(f"\n   Error combining df3d dataframe: {e} \n")
 
         # add sleap dataframe if present
         try:
@@ -229,7 +221,7 @@ class DfTask(Task):
         except FileNotFoundError:
             pass
         except Exception as e:
-            log.add_line_to_log(f"Error combining df3d dataframe: {e}")
+            log.add_line_to_log(f"\n   Error combining df3d dataframe: {e} \n")
 
         return True
 
@@ -248,7 +240,6 @@ class FictracTask(Task):
             fictrac.config_and_run_fictrac(torun_dict['full_path'])
             _ = fictrac.get_fictrac_df(torun_dict['full_path'])
         except Exception as e:
-            log.add_line_to_log(f"Error running {self.name}: {e}")
             raise e
         
         return True
@@ -272,7 +263,6 @@ class Df3dTask(Task):
             _ = df3d.get_df3d_df(trial_dir)
 
         except Exception as e:
-            log.add_line_to_log(f"Error running {self.name}: {e}")
             raise e
     
         return True
@@ -293,7 +283,6 @@ class SleapTask(Task):
             sleap.make_sleap_df(trial_dir)
 
         except Exception as e:
-            log.add_line_to_log(f"Error running {self.name}: {e}")
             raise e
         
         return True
@@ -315,7 +304,6 @@ class GridTask(Task):
             videos.make_video_grid(trial_dir, camera_num)
 
         except Exception as e:
-            log.add_line_to_log(f"Error running {self.name}: {e}")
             raise e
         return True 
 
@@ -337,7 +325,6 @@ class GridTask(Task):
 #             # enter functions to run here
 #             # DO NOT write specific code lines here, use EXTERNAL FUNCTIONS instead
 #         except Exception as e:
-#             log.add_line_to_log(f"Error running {self.name}: {e}")
 #             raise e
 #         return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
 

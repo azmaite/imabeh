@@ -25,9 +25,9 @@ def main() -> None:
     task_manager = TaskManager(log, user_config, task_collection) ######### FIX params=global_params, 
 
     # log start of processing and list of tasks to do
-    log.add_line_to_log("Will start task manager with the following tasks:")
+    log.add_line_to_log("Will start task manager with the following tasks: \n")
     for _, torun in task_manager.torun_table.iterrows():
-        log.add_line_to_log("%-*s - %s" % (40, f"{torun.fly_dir} / {torun.trial}",torun.task))
+        log.add_line_to_log("  %-*s - %s \n" % (40, f"{torun.fly_dir} / {torun.trial}",torun.task))
 
     # run task manager
     task_manager.run(log)

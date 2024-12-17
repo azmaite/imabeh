@@ -110,7 +110,7 @@ class LogManager():
         # add a new line to the task log
         log_file_path = os.path.join(self.log_folder, self.log_file)
         with open(log_file_path, "a") as file:
-            file.write(line + '\n')
+            file.write(line)
 
         # print the line to the console
-        print(line)
+        print(line.rstrip("\n"))
