@@ -418,8 +418,8 @@ def find_raw_file(directory):
     """
     This function finds the path to the raw file
     "Image_0001_0001.raw" created by ThorImage and returns it.
-    If multiple files with this name are found, it throws
-    an exception unless.
+    If multiple files with this name are found, it throws an exception.
+    If not found is found, it throws an exception.
 
     Parameters
     ----------
@@ -432,14 +432,17 @@ def find_raw_file(directory):
         Path to raw file.
     """
     # some versions of ThorImage save the raw file as "Image_001_001.raw or Image_0001_0001.raw"
-    try:
-        return _find_file(directory,
-                          "Image_0001_0001.raw",
-                          "raw")
-    except:
-        return _find_file(directory,
-                        "Image_001_001.raw",
-                        "raw")
+    filenames = ["Image_0001_0001.raw", "Image_001_001.raw"]
+    for filename in filenames:
+        try:
+            file = _find_file(directory, filename, "raw")
+            return file
+
+        except FileNotFoundError:
+            continue  
+    
+    raise FileNotFoundError(f"No raw file found in {directory}")
+
     
 def find_tif_file(directory, channel_num : int = 1):
     """
@@ -937,7 +940,11 @@ def create_tiffs(directory):
         Path to directory containing files
     """
     # find files
-    raw_path = find_raw_file(directory)
+    try:
+        raw_path = find_raw_file(directory)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"No raw file found")
+
     raw_directory = os.path.dirname(raw_path)
     metadata_path = find_metadata_file(directory)
     metadata_directory = os.path.dirname(metadata_path)

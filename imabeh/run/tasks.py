@@ -100,7 +100,7 @@ class Task:
         except Exception as e:
             # log the failure of the task in general log
             log.add_line_to_log(f"FAILED @ {datetime.now().isoformat(sep=' ')} \n")
-            log.add_line_to_log(f"......... Error: {e} \n")
+            log.add_line_to_log(f"        Error: {e} \n")
             log.add_line_to_log(f"\n")
             raise RuntimeError(f"Error running {self.name} task: {e}")
 
