@@ -299,6 +299,10 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
                 "Main_df has {} ticks, new_df has {} lines. \n".format(len(main_df), len(new_df))+\
                 "Trial: "+ trial_dir)
         
+    # get attributes from both dataframes
+    both_attrs = main_df.attrs
+    both_attrs.update(new_df.attrs)
+        
     # add new to main_df
     keys_to_add = []
     replaced_keys = False
@@ -314,9 +318,8 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     if replaced_keys:
         log.add_line_to_log(f"  Replaced duplicate keys in main processing dataframe at {main_df_path}")
 
-    # combine atributes too, if any!
-    if new_df.attrs:
-        main_df.attrs.update(new_df.attrs)
+    # add attributes!
+    main_df.attrs = both_attrs
 
     # save the main dataframe
     main_df.to_pickle(main_df_path)
