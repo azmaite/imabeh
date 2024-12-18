@@ -19,7 +19,7 @@ import pandas as pd
 import os
 import itertools
 
-from imabeh.run.tasks import Task, task_collection, pipeline_dict
+from imabeh.run.tasks import Task, task_collection, task_pipeline_dict, full_pipeline_dict
 
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 
@@ -121,6 +121,7 @@ class TaskManager():
             - "taskstatus_log": the path to the taskstatus log file
         """
         # log the start of the creation of the torun_table
+        print('')
         log.add_line_to_log("-------CREATING TORUN TABLE-------\n")
 
         # create empty to_run table
@@ -156,7 +157,7 @@ class TaskManager():
 
             # if already completed and overwrite = True, change status in fly_table to 2 (to allow it to be re-run)
             elif table_status == 1 and torun.overwrite == True: 
-                log.add_line_to_log(f"OVERWRITE - task '{torun.task}' for fly '{torun.fly_dir}' trial '{torun.trial}' already completed but will be overwritten /n")
+                log.add_line_to_log(f"OVERWRITE - task '{torun.task}' for fly '{torun.fly_dir}' trial '{torun.trial}' already completed but will be overwritten \n")
                 self.fly_table.update_trial_task_status(torun_dict, status = 2)
         
         # iterate over toruns to check pre-requisites for each task and set statuses acordingly
@@ -263,7 +264,10 @@ class TaskManager():
             strings = line.split("||")
             # split trials and tasks to make a list of each
             trials = strings[1].split(',')
-            tasks = strings[2].split(',')
+            try:
+                tasks = strings[2].split(',')
+            except:
+                tasks = ['']
             # make fly_dict
             fly_dict = {
                 "fly_dir": strings[0],
@@ -272,8 +276,8 @@ class TaskManager():
                 }
             fly_dicts.append(fly_dict)
 
-        # iterate across fly_dicts to check for modifications
-        # (in reverse order so elements can be removed without affecting the loop)
+        # iterate over fly_dicts to check that fly dirs are real
+        # and for full pipelines - in case a new fly_dict is created
         for f, fly_dict in reversed(list(enumerate(fly_dicts))): 
 
             # check that all fly_dirs are real folders - if not, log and remove
@@ -283,9 +287,18 @@ class TaskManager():
                 fly_dicts.pop(f)
                 continue
 
-            # replace pipelines with the tasks they contain
+            # replace full pipelines with the keyworkds and tasks they contain
+            # It can create multiple fly_dicts for each fly
+            new_fly_dicts = self._read_full_pipelines(fly_dict, log)
+            fly_dicts = fly_dicts[0:f] + new_fly_dicts + fly_dicts[f+1:]
+
+        # iterate across fly_dicts to check for modifications
+        # (in reverse order so elements can be removed without affecting the loop)
+        for f, fly_dict in reversed(list(enumerate(fly_dicts))): 
+
+            # replace task pipelines with the tasks they contain
             # if p-!, add ! in front of all tasks (each will be overwritten)
-            fly_dict = self._read_pipelines(fly_dict, log)
+            fly_dict = self._read_task_pipelines(fly_dict, log)
 
             # get all trials if 'all' is present
             fly_dict = self._get_all_trials(fly_dict)
@@ -304,7 +317,57 @@ class TaskManager():
 
         return fly_dicts
 
-    def _read_pipelines(self, fly_dict, log):
+    def _read_full_pipelines(self, fly_dict, log):
+        """ For even simpler pipeline management, you can just specify an experiment dir (Fly) and a pipeline name
+        (no trials, no tasks). Example: "date_genotype/Fly1||p-ablation"
+        In this case, the pipeline will be replaced by trials=pipeline keywords, tasks=pipeline tasks
+        If the pipeline is set to be overwritten (p-!), add ! in front of all tasks in the pipeline
+
+        Parameter and Returns
+        ---------------------
+        fly_dict: dict 
+            dict containing fly_dir, trials, tasks
+        log: LogManager
+            to log any wrong pipelines entered
+        """
+        trials = fly_dict['trials']
+        tasks = fly_dict['tasks']
+
+        # For full pipelines to work, there should be only one trial and no tasks
+        # If not, return an empty fly dict and log
+
+        if len(tasks) ==1 and tasks[0] == '' and len(trials) == 1 and trials[0].startswith('p-'):
+            # get pipeline name and remove ! if present
+            pipeline = trials[0][2:].replace("!","")
+
+            # get keywords and tasks in pipeline
+            try:
+                new_pipeline = full_pipeline_dict[pipeline]
+            # if pipeline not found in pipeline_dict, log and remove
+            except KeyError:
+                log.add_line_to_log(f"Pipeline '{pipeline}' is not defined in full_pipeline_dict\n")
+                fly_dict['trials'] = []
+                return fly_dict
+            
+            # make a new fly_dict by copying the original as many times as rows in the pipeline
+            fly_dict = [deepcopy(fly_dict) for _ in range(len(new_pipeline))]
+
+            # For each row in the full_pipeline_dict, add the trials and tasks to the fly_dict
+            for i, row in enumerate(new_pipeline):
+                fly_dict[i]['trials'] = row[0]
+                fly_dict[i]['tasks'] = row[1]
+
+                # if overwrite (p-!), add ! in front of all tasks
+                if trials[0].startswith("p-!"):
+                    fly_dict[i]['tasks'] = ["!" + t for t in fly_dict[i]['tasks']]
+
+        else:
+            fly_dict = [fly_dict]
+
+        return fly_dict
+
+
+    def _read_task_pipelines(self, fly_dict, log):
         """ If any task starts with 'p-', replace it with the tasks in the pipeline.
         The list of preset pipelines is imported from imabeh/run/tasks.py
 
@@ -325,10 +388,10 @@ class TaskManager():
 
                 # get tasks in pipeline
                 try:
-                    new_tasks = pipeline_dict[pipeline]
+                    new_tasks = task_pipeline_dict[pipeline]
                 # if pipeline not found in pipeline_dict, log and remove
                 except KeyError:
-                    log.add_line_to_log(f"Pipeline '{pipeline}' is not defined in pipeline_dict\n")
+                    log.add_line_to_log(f"Pipeline '{pipeline}' is not defined in task_pipeline_dict\n")
                     tasks.pop(t)
                     continue
 
@@ -591,7 +654,6 @@ class TaskManager():
     
         # remove row
         self.torun_table = self.torun_table.drop(torun_index)
-
         
     def _check_duplicates(self, log: LogManager):
         """ 

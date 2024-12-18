@@ -332,11 +332,15 @@ class GridTask(Task):
 ## END OF TASK DEFINITIONS
 
 ## PIPELINES
-# add new pipeline sets here as list of task names
-pipeline_dict = {
+# add new task pipeline sets here as list of task names 
+# OR full pipelines as lists of keywords + task names (ex. [["k-beh"],["grid", "df"]]) 
+# this will replace both the trials and tasks
+task_pipeline_dict = {
     "test" : ["tif", "df"],
-    "ablation_beh" : ["grid", "df3d", "fictrac", "df"],
-    "ablation_stack" : ["tif", "flat"],
+}
+full_pipeline_dict = {
+    "ablation" : [[["k-beh"],["df3d", "fictrac", "df", "grid"]],
+                  [["k-stack"],["tif", "flat"]]],
     }
 
 

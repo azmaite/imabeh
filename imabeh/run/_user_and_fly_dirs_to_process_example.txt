@@ -24,13 +24,15 @@ CURRENT_USER = USER_JSP_scope
 #    e- before a trial name (or start of name) indicates this trial will be excluded
 #
 #    ! before a task forces an overwrite.
-#    p- before a task indicates pipeline (a preset set of tasks)
+#    p- before a task indicates a task pipeline (a preset set of tasks)
+#    you can also have a pipeline in the trial position - this is a full pipeline, and it will replace the trials with preset keywords and tasks with preset tasks
 
 # Examples:
 240729_T-36_Ablation/Fly2||002_pre-beh,004_post-beh||!fictrac,df3d
-240621_T-17_MDN-GCaMP6f/Fly1||002,003,005||p-ablation
+240621_T-17_MDN-GCaMP6f/Fly1||002,003,005||p-test
 240215_T-36_Ablation/Fly1||k-stack,e-003||p-!stack,df
 240210_T-2_Test/Fly3||all,e-005_error||p-stack,fictrac
+240210_T-2_Test/Fly3||p-!ablation
 
 
 
