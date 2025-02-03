@@ -735,14 +735,14 @@ class TaskManager():
 
                 # if missing, remove the task and log
                 if prereq_index is None:
-                    log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is missing. Removing task \n")
+                    log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is missing. Removing task \n \n")
                     self._remove_torun(torun_dict)
                     all_prereqs_present = False
                     break
 
                 # if present, check if it is before the task. If not, remove
                 elif prereq_index > torun_index:
-                    log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is after the task. Removing task\n")
+                    log.add_line_to_log(f"Prerequisite task '{prereq}' for task '{torun_dict['task']}' for fly '{torun_dict['fly_dir']}' trial '{torun_dict['trial']}' is after the task. Removing task\n \n")
                     self._remove_torun(torun_dict)
                     all_prereqs_present = False 
                     break
