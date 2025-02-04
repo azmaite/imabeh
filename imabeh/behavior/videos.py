@@ -17,9 +17,6 @@ def make_video_grid(trial_dir, camera_num):
   
     # Video path and properties
     video_path = os.path.join(trial_dir, "behData", "images", f"camera_{camera_num}.mp4")
-    # delete  video if it exists
-    if os.path.exists(video_path):
-        os.remove(video_path)
     cap = cv2.VideoCapture(video_path)
     hz = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
