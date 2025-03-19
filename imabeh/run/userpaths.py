@@ -92,7 +92,7 @@ USER_TEST = {
 
 USER_MA_2p2 = {
     "initials": "MA_2p2",
-    "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA"),
+    "labserver_data": os.path.join(GLOBAL_PATHS['labserver_data'], "MA/2P"),
     "scope": "2p_2",
     "local_data": "/home/azcorra/Data_downloaded/df3d_local",
 }
