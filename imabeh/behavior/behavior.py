@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import cv2
+import pickle
 
 from imabeh.general import main
 from imabeh.run.userpaths import user_config
@@ -72,11 +73,15 @@ def split_videos(trial_dir, pad = 2.5):
         cap.release()
 
 
-    # Split df dataframe too and save
-    df_dir = os.path.join(trial_dir, user_config["processed_path"])#, "processed_df.pkl")
+    # Split df dataframe too
+    df_stim = []
     for i, (start, finish) in enumerate(zip(starts, finishes)):
         new_df = df[start:finish]
-        new_df.to_pickle(os.path.join(df_dir, f"processed_df_stim_{i+1}.pkl"))
+        df_stim.append(new_df)
+    # Save new df list
+    df_path = os.path.join(trial_dir, user_config["processed_path"], f"processed_df_stim.pkl")
+    with open(df_path, "wb") as f:
+        pickle.dump(df_stim, f)
 
     
 
