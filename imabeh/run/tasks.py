@@ -237,8 +237,9 @@ class FictracTask(Task):
     def _run(self, torun_dict, log) -> bool:
         try:
             # run fictrac and convert output to df
-            fictrac.config_and_run_fictrac(torun_dict['full_path'])
-            _ = fictrac.get_fictrac_df(torun_dict['full_path'])
+            trial_dir = torun_dict['full_path']
+            fictrac.config_and_run_fictrac(trial_dir)
+            _ = fictrac.get_fictrac_df(trial_dir)
         except Exception as e:
             raise e
         
@@ -306,6 +307,25 @@ class GridTask(Task):
         except Exception as e:
             raise e
         return True 
+    
+
+class SplitTask(Task):
+    """ Splits video into subsections based on the stimulation times. Splits the df too.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "split"
+        self.prerequisites = ['df']
+
+    def _run(self, torun_dict, log) -> bool:
+        try:
+            trial_dir = torun_dict['full_path']
+            videos.split_videos(trial_dir)
+        except Exception as e:
+            raise e
+        return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
+
 
 
 
