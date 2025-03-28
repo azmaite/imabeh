@@ -55,21 +55,23 @@ def run_df3d(trial_dir : str):
     # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
     # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
     df3dcli()
+    print('df3d done!')
 
-    # Make 3d-videos! only for first 200 frames (takes a while)
-    n = 200
+    # Make 3d-videos! only for first 150 frames (it's slow)
+    n = 150
     # print time
-    print('making videos at time = ', datetime.datetime.now())
+    print('\n making videos at time = ', datetime.datetime.now())
     print(f"frames used = {n}")
     sys.argv = [
         "df3d-cli",         # The name of the command           
         "-o", images_dir,  
-        "--output-folder", 'df3d',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
+        "--output-folder", output_dir_name,  # Temporary folder to save the results (df3d cannot save outside of images_dir)
         "--order", *map(str, camera_ids),
         "--video-3d",               # Generate pose3d videos
         "-n", str(n),               # Number of frames to generate videos for
         "--skip-pose-estimation"    # Skip pose estimation (already done)
     ]
+
     df3dcli()
     print('done making videos at time = ', datetime.datetime.now())
 
@@ -85,6 +87,7 @@ def run_df3d(trial_dir : str):
     os.rmdir(output_dir_temp)
 
     # delete all jpgs
+    print('deleting jpgs...')
     for file in os.listdir(images_dir):
         if file.endswith('.jpg'):
             os.system('rm ' + os.path.join(images_dir, file))
@@ -243,11 +246,15 @@ def video_df3d(trial_dir):
     """ Create a short video of the pose estimation results from df3d
     superimposed on the original video."""
 
+    # Prepare the data for df3d by copying the images to the local data folder
+    # this will make it faster to run df3d
+    _prepare_df3d(trial_dir)
+
     # Get the output_dir and camera_ids from user_config
     output_dir = user_config["df3d_path"]
     camera_ids = user_config["camera_order"]
     # get the local folder where the images were copied to
-    images_dir = os.path.join(trial_dir, "behData", "images")
+    images_dir = os.path.join(user_config["local_data"], *trial_dir.split(os.sep)[-3:], "images")
 
     # Simulate the command-line arguments
     sys.argv = [
@@ -256,10 +263,10 @@ def video_df3d(trial_dir):
         "--output-folder", 'df3d',  # Temporary folder to save the results (df3d cannot save outside of images_dir)
         "--order", *map(str, camera_ids),
         "--video-3d",               # Generate pose3d videos
-        "-n 100",                   # Number of frames to generate videos for
-        "--skip-pose-estimation"    # Skip pose estimation (already done)
+        "-n 150",                   # Number of frames to generate videos for
     ]
-    print("frames used = 100")
+
+    print("frames used = 150")
     # Call the df3d main function to run
     # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
     # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
