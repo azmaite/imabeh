@@ -33,7 +33,7 @@ from imabeh.general.main import combine_df
 
 # task specific imports
 from imabeh.imaging2p import utils2p, static2p
-from imabeh.behavior import fictrac, df3d, sleap, videos
+from imabeh.behavior import behavior, fictrac, df3d, sleap, videos
 from imabeh.general import main
 
 
@@ -321,7 +321,7 @@ class SplitTask(Task):
     def _run(self, torun_dict, log) -> bool:
         try:
             trial_dir = torun_dict['full_path']
-            videos.split_videos(trial_dir)
+            behavior.split_videos(trial_dir)
         except Exception as e:
             raise e
         return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
