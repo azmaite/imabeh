@@ -106,6 +106,15 @@ def split_videos(trial_dir, pad = 2.5):
     matching sub-dataframes.
     """
 
+    # Get folder containing videos
+    video_dir = os.path.join(trial_dir, "behData", "images")
+
+    # get one video to get hz
+    video_path = os.path.join(video_dir, f"camera_5.mp4")
+    cap = cv2.VideoCapture(video_path)
+    hz = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+
     # Get main dataframe and stimulation times
     df = main.read_main_df(trial_dir)
     opto = df['opto_stim'].values
@@ -116,13 +125,11 @@ def split_videos(trial_dir, pad = 2.5):
     starts = (onsets_opto - pad * hz).astype(int)
     finishes = (offsets_opto + pad * hz).astype(int)
 
-    # Get folder containing videos
-    video_dir = os.path.join(trial_dir, "behData", "images")
-
     # Create subfolders for each of the stimulation periods
-    for i in len(starts):
+    for i in range(len(starts)):
         dir_name = video_path = os.path.join(video_dir, f"stim_{i+1}")
-        os.makedirs(dir_name)
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
 
     # iterate across all videos
     for camera_num in range(7):
@@ -144,7 +151,6 @@ def split_videos(trial_dir, pad = 2.5):
 
             # iterate through frames between start and finish
             cap.set(cv2.CAP_PROP_POS_FRAMES, start)
-            frames = []
             for _ in range(finish - start):
                 ret, frame = cap.read()
 
@@ -163,27 +169,6 @@ def split_videos(trial_dir, pad = 2.5):
     for i, (start, finish) in enumerate(zip(starts, finishes)):
         new_df = df[start:finish]
         new_df.to_pickle(os.path.join(df_dir, f"processed_df_stim_{i+1}.pkl"))
-
-    
-
-
-
-
-
-
-    # # run df3d, postprocess and get df
-    # df3d.run_df3d(trial_dir)
-    # df3d.postprocess_df3d_trial(trial_dir)
-    # _ = df3d.get_df3d_df(trial_dir)
-
-    # # run fictrac and convert output to df
-    # fictrac.config_and_run_fictrac(trial_dir)
-    # _ = fictrac.get_fictrac_df(trial_dir)
-        
-
-
-    
-
 
 
 
