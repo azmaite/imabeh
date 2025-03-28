@@ -34,6 +34,8 @@ def split_videos(trial_dir, pad = 2.5):
     starts = (onsets_opto - pad * hz).astype(int)
     finishes = (offsets_opto + pad * hz).astype(int)
 
+
+    ## SPLIT VIDEOS
     # Create subfolders for each of the stimulation periods
     for i in range(len(starts)):
         dir_name = video_path = os.path.join(video_dir, f"stim_{i+1}")
@@ -53,8 +55,12 @@ def split_videos(trial_dir, pad = 2.5):
         # for each stimulation
         for start, finish in zip(starts, finishes):
 
-            # Output video setup
+            # check if the video already exists, and skip if it does
             output_video_path = os.path.join(video_dir, f"stim_{i+1}", f"camera_{camera_num}_stim_{i+1}.mp4")
+            if os.path.exists(output_video_path):
+                continue
+
+            # Output video setup
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             out = cv2.VideoWriter(output_video_path, fourcc, hz, (width, height))
 
@@ -73,11 +79,12 @@ def split_videos(trial_dir, pad = 2.5):
         cap.release()
 
 
-    # Split df dataframe too
+    ## SPLIT MAIN DATAFRAME
     df_stim = []
     for i, (start, finish) in enumerate(zip(starts, finishes)):
         new_df = df[start:finish]
         df_stim.append(new_df)
+
     # Save new df list
     df_path = os.path.join(trial_dir, user_config["processed_path"], f"processed_df_stim.pkl")
     with open(df_path, "wb") as f:
