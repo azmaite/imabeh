@@ -10,6 +10,9 @@ import numpy as np
 import pandas as pd
 import sys
 import cv2
+import itertools
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 # IMPORT FUNCTIONS FROM df3d (deepfly3d package) and df3dPostProcessing
 from df3d.cli import main as df3dcli
@@ -266,21 +269,8 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap.release()
 
-    # Output video setup
-    output_video_path = os.path.join(trial_dir, "behData", "df3d", f"df3d_video.mp4")
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video_path, fourcc, hz/4, (width*3, height*2)) #4 times slowed down
-      
-    # set the colors for the left and right legs, and leg/abdomen names
-    legs_abd = ['F', 'M', 'H', 'Stripe'] # strip is for abdomen, 1, 2, 3
-    colors = {'L':[[15, 115, 153], [26, 141, 175], [117, 190, 203]], 'R':[[186, 30, 49], [201, 86, 79], [213, 133, 121]]} # LF, LM, LH, RF, RM, RH
-    leg_segments = ['Coxa', 'Femur', 'Tibia', 'Tarsus', 'Claw']
-    # convert all colors to BGR (OpenCV uses BGR)
-    for k in colors.keys():
-        for i in range(len(colors[k])):
-            colors[k][i] = colors[k][i][::-1]
 
-
+    ## MAKE 2D VIDEOS
     # Get video snippets for each camera in order
     videos = []
     for camera_idx, camera_num in enumerate(cameras):
@@ -293,7 +283,6 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
             RL = 'L'
         else:
             RL = 'R'
-        colors_RL = colors[RL]
 
         # get the video file
         video_path = os.path.join(trial_dir, 'behData', 'images', f'camera_{camera_num}.mp4')
@@ -305,40 +294,8 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
         for frame_num in range(end_frame - start_frame):
             _, frame = cap.read()
 
-            for leg_idx, leg in enumerate(legs_abd):
-
-                # get the leg points for each leg segment or abd
-                leg_points_idx = []
-                if leg == 'Stripe':
-                    segments = ['1', '2', '3']
-                else:
-                    segments = leg_segments
-
-                for segment in segments:
-                    # get the index for each leg segment
-                    leg_point_name = RL + leg + segment
-                    leg_point_idx = df3d_skeleton.index(leg_point_name)
-                    leg_points_idx.append(leg_point_idx)
-                # get the 2d points for each leg segment (x,y)
-                leg_points = points2d[camera_idx, start_frame+frame_num, leg_points_idx, :]
-                # get the color to plot
-                if leg == 'Stripe':
-                    color = [200, 200, 200]
-                else:
-                    color = colors_RL[leg_idx]
-
-                # Convert to absolute pixel coordinates
-                xy = np.transpose(np.vstack([leg_points[:, 1] * width, leg_points[:, 0] * height]))
-
-                # Ensure integer type and correct shape for OpenCV
-                xy = xy.astype(np.int32).reshape((-1, 1, 2))
-
-                # Draw the polyline for each leg/abd
-                cv2.polylines(frame, [xy], isClosed=False, color=color, thickness=7)
-                # Draw circles at each vertex
-                for point in xy:
-                    center = tuple(point[0])  # Extract (x, y) tuple
-                    cv2.circle(frame, center, radius=5, color=(128, 0, 0), thickness=5)  # Navy blue empty circles
+            # plot 2d points on the frame
+            frame = _plot_df3d_2d(frame, points2d, camera_idx, frame_num + start_frame, RL, width, height)
 
             # add frame to the list of frames for each video
             frames.append(frame)
@@ -350,20 +307,38 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
         cap.release()
 
 
+    ## Make the 3d videos and append
+    videos_3d = _make_df3d_3d(trial_dir, start_frame, end_frame, width)
+    videos.append(videos_3d[0])
+    videos.append(videos_3d[1])
+    videos.append(videos_3d[2])
+
+    # crop the 3d videos (too much black on top)
+    for i in range(6,9):
+        for t in range(len(videos[i])):
+            videos[i][t] = videos[i][t][200:,:,:]
+
+
+    # Output video setup
+    output_video_path = os.path.join(trial_dir, "behData", "df3d", f"df3d_video_3d.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_video_path, fourcc, hz/4, (width*3, height*3+280)) #4 times slowed down
+
     # Create grid frame by frame
-    for t in range(end_frame - start_frame):
+    for t in range(end_frame - start_frame - 1):
         # stack the frames for each camera row by row
         grid_frames = []
-        for j in range(2): # 2 rows
+        for j in range(3): # 3 rows
             row_frames = [videos[j * 3 + k][t] for k in range(3)]
             grid_frames.append(np.hstack(row_frames))
         grid_frame = np.vstack(grid_frames)
-        
         # save frame
         out.write(grid_frame)
 
     # Release resources
     out.release()
+
+    return videos, grid_frame
 
 
 
@@ -399,3 +374,153 @@ def _prepare_df3d(trial_dir : str):
     os.system(f"cp -r {images_dir} {local_data_folder}")
     
     return os.path.join(local_data_folder, 'images')
+
+
+def _plot_df3d_2d(frame, points2d, camera_idx, frame_num, RL, width, height):
+    
+    # set the colors for the left and right legs, and leg/abdomen names
+    legs_abd = ['F', 'M', 'H', 'Stripe'] # strip is for abdomen, 1, 2, 3
+    colors = {'L':[[15, 115, 153], [26, 141, 175], [117, 190, 203]], 'R':[[186, 30, 49], [201, 86, 79], [213, 133, 121]]} # LF, LM, LH, RF, RM, RH
+    leg_segments = ['Coxa', 'Femur', 'Tibia', 'Tarsus', 'Claw']
+    # convert all colors to BGR (OpenCV uses BGR)
+    for k in colors.keys():
+        for i in range(len(colors[k])):
+            colors[k][i] = colors[k][i][::-1]
+
+    # get colors
+    colors_RL = colors[RL]
+
+    for leg_idx, leg in enumerate(legs_abd):
+        # get the leg points for each leg segment or abd
+        leg_points_idx = []
+        if leg == 'Stripe':
+            segments = ['1', '2', '3']
+        else:
+            segments = leg_segments
+
+        for segment in segments:
+            # get the index for each leg segment
+            leg_point_name = RL + leg + segment
+            leg_point_idx = df3d_skeleton.index(leg_point_name)
+            leg_points_idx.append(leg_point_idx)
+        # get the 2d points for each leg segment (x,y)
+        leg_points = points2d[camera_idx, frame_num, leg_points_idx, :]
+        # get the color to plot
+        if leg == 'Stripe':
+            color = [200, 200, 200]
+        else:
+            color = colors_RL[leg_idx]
+
+        # Convert to absolute pixel coordinates
+        xy = np.transpose(np.vstack([leg_points[:, 1] * width, leg_points[:, 0] * height]))
+
+        # Ensure integer type and correct shape for OpenCV
+        xy = xy.astype(np.int32).reshape((-1, 1, 2))
+
+        # Draw the polyline for each leg/abd
+        cv2.polylines(frame, [xy], isClosed=False, color=color, thickness=7)
+        # Draw circles at each vertex
+        for point in xy:
+            center = tuple(point[0])  # Extract (x, y) tuple
+            cv2.circle(frame, center, radius=5, color=(128, 0, 0), thickness=5)  # Navy blue empty circles
+
+    return frame
+
+
+def _make_df3d_3d(trial_dir, start_frame, end_frame, width):
+
+    # load aligned 3d points
+    df3d_dir = trial_dir + '/behData/df3d'
+    df3d_aligned = find_df3d_file(df3d_dir, 'aligned', most_recent=True)
+    df3d_aligned = pickle.load(open(df3d_aligned, 'rb'))
+
+    # set the colors for the left and right legs, and leg names
+    legs = ['F', 'M', 'H']
+    sides = ['R','L']
+    colors = {'L':[[15, 115, 153], [26, 141, 175], [117, 190, 203]], 'R':[[186, 30, 49], [201, 86, 79], [213, 133, 121]]} # LF, LM, LH, RF, RM, RH
+    leg_segments = ['Coxa', 'Femur', 'Tibia', 'Tarsus', 'Claw']
+    # convert all colors to BGR (OpenCV uses BGR)
+    for k in colors.keys():
+        for i in range(len(colors[k])):
+            colors[k][i] = colors[k][i][::-1]
+
+    videos = [[], [], []]
+    for frame_num in range(start_frame, end_frame):
+
+        # make empty 3d figure
+        fig = plt.figure(figsize=(4,4))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # plot legs
+        for leg, side in itertools.product(legs, sides):
+            legRL = side + leg
+            leg_points = []
+            for segment in leg_segments:
+                xyz = df3d_aligned[f'{legRL}_leg'][segment]['raw_pos_aligned'][frame_num]
+                leg_points.append(xyz)
+            leg_points = np.vstack(leg_points)
+
+            # plot
+            color = np.divide(colors[side][legs.index(leg)], 255)
+            ax.plot(leg_points[:, 0], leg_points[:, 1], leg_points[:, 2], color=color, linewidth=3)
+
+        # plot abdomen
+        #TODO
+
+        ## STYLE OF PLOT
+        # Remove grid and make background black
+        ax.set_facecolor('black')  # Set figure background
+        ax.grid(False)  # Remove grid
+
+        # Hide axes and ticks
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zticks([])
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        ax.set_zlabel('')
+
+        # Set limits
+        ax.set_xlim([-2, 2])
+        ax.set_ylim([-2, 2])
+        ax.set_zlim([-2, 0.5])
+
+        # Make back panes black
+        ax.xaxis.set_pane_color((0, 0, 0, 1))
+        ax.yaxis.set_pane_color((0, 0, 0, 1))
+
+        # set view angle (x3) - and save each view
+        angles = [70, 120, 170]
+        for i, angle in enumerate(angles):
+            ax.view_init(elev=30, azim=angle)
+
+            # Save the figure as an image
+            converted_img = _figure_to_image(fig, width)
+            videos[i].append(converted_img)
+
+        plt.close(fig)  # Close figure so it doesn't show in interactive environments
+
+    # return images
+    return videos
+
+
+def _figure_to_image(fig, width):
+    """Convert a Matplotlib figure to a NumPy RGB image without a white border."""
+    fig.patch.set_alpha(0)  # Ensure the figure background is transparent
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)  # Remove padding
+    
+    # Draw figure
+    fig.canvas.draw()
+    
+    # Convert to NumPy array
+    img = np.array(fig.canvas.renderer.buffer_rgba())
+    
+    # Remove alpha channel (RGBA -> RGB)
+    img = img[:, :, :3]
+
+    # Resize to match the desired width while maintaining aspect ratio
+    aspect_ratio = img.shape[1] / img.shape[0]
+    new_height = int(width / aspect_ratio)
+    img_resized = cv2.resize(img, (width, new_height))
+
+    return img_resized
