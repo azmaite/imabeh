@@ -24,7 +24,7 @@ from imabeh.run.userpaths import user_config, LOCAL_DIR
 from imabeh.general.main import find_file
    
 
-def run_df3d(trial_dir : str, video = False):
+def run_df3d(trial_dir : str):
     """run deepfly3d.
     To make it faster to run, the images are copied to a local folder and df3d is run on the local folder.
     The results are then moved to the correct output directory, and the local folder is deleted.
@@ -34,8 +34,6 @@ def run_df3d(trial_dir : str, video = False):
     trial_dir : str
         directory of the trial. should contain "behData/images" folder
         df3d will be saved within this trial folder as specified in the user_config
-    video : bool
-        whether to create a 3d video of the pose estimation
     """
 
     # Prepare the data for df3d by copying the images to the local data folder
@@ -49,22 +47,13 @@ def run_df3d(trial_dir : str, video = False):
 
     # Simulate the command-line arguments
     output_dir_name = 'df3d'
-    if not video:
-        sys.argv = [
-            "df3d-cli",         # The name of the command           
-            "-o", local_images_dir,  
-            "--output-folder", output_dir_name,  # Temporary folder to save the results (df3d cannot save outside of images_dir)
-            "--order", *map(str, camera_ids),
-        ]
-    else:
-        sys.argv = [
-            "df3d-cli",         # The name of the command           
-            "-o", local_images_dir,  
-            "--output-folder", output_dir_name,  # Temporary folder to save the results (df3d cannot save outside of images_dir)
-            "--order", *map(str, camera_ids),
-            "--video-3d",               # Generate pose3d videos
-            "-n", "400"
-        ]
+    sys.argv = [
+        "df3d-cli",         # The name of the command           
+        "-o", local_images_dir,  
+        "--output-folder", output_dir_name,  # Temporary folder to save the results (df3d cannot save outside of images_dir)
+        "--order", *map(str, camera_ids),
+    ]
+
     # Call the df3d main function to run
     # MAKE SURE YOUR .bashrc FILE HAS "export CUDA_VISIBLE_DEVICES=0" 
     # OR THE GPU WONT BE USED AND DF3D WILL BE SLOW!!!!!
@@ -234,9 +223,14 @@ def get_df3d_df(trial_dir):
     
     return df_out_dir
 
-
-def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
-    """ make a video of the 2d and 3d pose estimation after PostProcessing.
+def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = None):
+    """ make a video of the 2d and 3d pose estimation after PostProcessing
+    Original videos plus 2d tracking points are stacked in a grid with the left legs 
+    on top and right legs on the bottom. Below, the 3d pose estimation (after
+    postprocessing) is shown from 3 different angles. 
+    Video is saved in the same folder as the df3d outputs.
+    Video frame rate is 4 times slower than the original video.
+    The start and end frames are specified in the function call.
 
     Parameters
     ----------
@@ -245,7 +239,7 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
     start_frame : int
         starting frame for the video
     end_frame : int
-        ending frame for the video
+        ending frame for the video. If none, it will be the last frame of the video
     """
 
     # get the df3d result file (after post-processing) - including 2d and 3d results
@@ -267,8 +261,12 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
     hz = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    cap.release()
 
+    # if end_frame is None, set it to the last frame of the video
+    if end_frame is None:
+        end_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    cap.release()
 
     ## MAKE 2D VIDEOS
     # Get video snippets for each camera in order
@@ -295,7 +293,7 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
             _, frame = cap.read()
 
             # plot 2d points on the frame
-            frame = _plot_df3d_2d(frame, points2d, camera_idx, frame_num + start_frame, RL, width, height)
+            frame = _plot_df3d_2d(frame, points2d, camera_idx, frame_num + start_frame, RL)
 
             # add frame to the list of frames for each video
             frames.append(frame)
@@ -320,7 +318,7 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
 
 
     # Output video setup
-    output_video_path = os.path.join(trial_dir, "behData", "df3d", f"df3d_video_3d.mp4")
+    output_video_path = os.path.join(trial_dir, "behData", "df3d", f"df3d_video_3d_(x0.25).mp4")
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_video_path, fourcc, hz/4, (width*3, height*3+280)) #4 times slowed down
 
@@ -338,13 +336,7 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = 100):
     # Release resources
     out.release()
 
-    return videos, grid_frame
 
-
-
-
-
-    
 
 
 
@@ -376,7 +368,29 @@ def _prepare_df3d(trial_dir : str):
     return os.path.join(local_data_folder, 'images')
 
 
-def _plot_df3d_2d(frame, points2d, camera_idx, frame_num, RL, width, height):
+def _plot_df3d_2d(frame, points2d, camera_idx, frame_num, RL):
+    """ plot the 2d tracking points on the frame, obtained from the 2D output of df3d,
+    which are stored in the df3d_results pickle file.
+    Colors are in BGR format (OpenCV uses BGR).
+    
+    Parameters
+    ----------
+    frame : np.array
+        frame to plot on
+    points2d : np.array
+        2d points from df3d result file
+    camera_idx : int
+        index of the camera to plot (to get correct points from points2d)
+    frame_num : int
+        frame number to plot (to get correct points from points2d)
+    RL : str
+        'L' or 'R' for left or right legs, depending on the camera number
+
+    Returns
+    -------
+    frame : np.array
+        frame with the 2d points plotted on it
+    """
     
     # set the colors for the left and right legs, and leg/abdomen names
     legs_abd = ['F', 'M', 'H', 'Stripe'] # strip is for abdomen, 1, 2, 3
@@ -412,6 +426,8 @@ def _plot_df3d_2d(frame, points2d, camera_idx, frame_num, RL, width, height):
             color = colors_RL[leg_idx]
 
         # Convert to absolute pixel coordinates
+        width = frame.shape[1]
+        height = frame.shape[0]
         xy = np.transpose(np.vstack([leg_points[:, 1] * width, leg_points[:, 0] * height]))
 
         # Ensure integer type and correct shape for OpenCV
@@ -428,6 +444,29 @@ def _plot_df3d_2d(frame, points2d, camera_idx, frame_num, RL, width, height):
 
 
 def _make_df3d_3d(trial_dir, start_frame, end_frame, width):
+    """ make a 3d video of the pose estimation using df3d.
+    Uses the POST PROCESSED data resulting from postprocess_df3d_trial, stored in
+    the df3d_aligned pkl file. This does not include abdomen (for now).
+    It outputs 3 videos, one for each view angle (70, 120, 170 degrees).
+    Colors are in BGR format (OpenCV uses BGR).
+    
+    Parameters
+    ----------
+    trial_dir : str
+        base directory where pose estimation results can be found
+    start_frame : int
+        starting frame for the video
+    end_frame : int
+        ending frame for the video
+    width : int
+        width of the output video (height is calculated to maintain aspect ratio) 
+        - to match original videos and easily stack under them.
+    
+    Returns
+    -------
+    videos : list
+        list of 3d videos for each view angle (70, 120, 170 degrees)
+    """
 
     # load aligned 3d points
     df3d_dir = trial_dir + '/behData/df3d'

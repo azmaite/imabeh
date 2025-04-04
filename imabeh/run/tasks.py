@@ -23,8 +23,8 @@ pipeline_dict:
 
 # general imports
 import os
-import time
 from datetime import datetime
+import pickle
 
 # imports for the task manager to run
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
@@ -199,7 +199,7 @@ class DfTask(Task):
             fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
             combine_df(torun_dict['full_path'], fictrac_df_path, log)
         except FileNotFoundError:
-            log.add_line_to_log("\n   No fictrac dataframe found \n")
+            pass
         except Exception as e:
             log.add_line_to_log(f"\n   Error combining fictrac dataframe: {e} \n")
 
@@ -209,7 +209,7 @@ class DfTask(Task):
             df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
             combine_df(torun_dict['full_path'], df3d_df_path, log)
         except FileNotFoundError:
-            log.add_line_to_log("\n   No df3d dataframe found \n")
+            pass
         except Exception as e:
             log.add_line_to_log(f"\n   Error combining df3d dataframe: {e} \n")
 
@@ -228,6 +228,7 @@ class DfTask(Task):
 class FictracTask(Task):
     """ 
     Task to run fictrac to track the ball movement and convert output to df.
+    Combine the resulting dataframe to the main behavior dataframe.
     """
     def __init__(self):
         super().__init__()
@@ -235,11 +236,17 @@ class FictracTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
+        trial_dir = torun_dict['full_path']
         try:
             # run fictrac and convert output to df
-            trial_dir = torun_dict['full_path']
             fictrac.config_and_run_fictrac(trial_dir)
             _ = fictrac.get_fictrac_df(trial_dir)
+
+            # add fictrac dataframe to main dataframe
+            fictrac_dir = os.path.join(trial_dir, user_config['fictrac_path'])
+            fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
+            combine_df(trial_dir, fictrac_df_path, log)
+
         except Exception as e:
             raise e
         
@@ -263,6 +270,14 @@ class Df3dTask(Task):
             df3d.postprocess_df3d_trial(trial_dir)
             _ = df3d.get_df3d_df(trial_dir)
 
+            # add df3d dataframe to main df
+            df3d_dir = os.path.join(trial_dir, user_config['df3d_path'])
+            df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
+            combine_df(trial_dir, df3d_df_path, log)
+
+            # make df3d videos on a subset of frames (aiming to get stimulation period)
+            df3d.df3d_video(trial_dir, start_frame=700, end_frame=1100) 
+
         except Exception as e:
             raise e
     
@@ -280,8 +295,14 @@ class SleapTask(Task):
     def _run(self, torun_dict, log) -> bool:
         trial_dir = torun_dict['full_path']
         try:
+            # run sleap and convert output to df
             sleap.run_sleap(trial_dir, camera_num='5')
             sleap.make_sleap_df(trial_dir)
+
+            # add sleap dataframe to main df
+            sleap_dir = os.path.join(trial_dir, 'behData/sleap')
+            sleap_df_path = sleap_dir + "/sleap_df.pkl"
+            combine_df(trial_dir, sleap_df_path, log)
 
         except Exception as e:
             raise e
@@ -322,9 +343,62 @@ class SplitTask(Task):
         try:
             trial_dir = torun_dict['full_path']
             behavior.split_videos(trial_dir)
+
         except Exception as e:
             raise e
-        return True # if task is run outside of python/bash, return False AND IMPLEMENT test_finished METHOD!!!
+        return True
+
+
+class SplitBehTask(Task):
+    """ Runs df3d and fictrac on the split videos.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "splitBeh"
+        self.prerequisites = ['df', 'split']
+
+    def _run(self, torun_dict, log) -> bool:
+        try:
+            # get list of split videos
+            trial_images_dir = os.path.join(torun_dict['full_path'], 'behData', 'images')
+            split_list = os.listdir(trial_images_dir)
+            split_list = [i for i in split_list if 'stim_' in i]
+            split_list.sort()
+
+            for split in split_list:
+                split_dir = os.path.join(trial_images_dir, split)
+
+                # run df3d on each split video
+                df3d.run_df3d(split_dir)
+                df3d.postprocess_df3d_trial(split_dir)
+                df3d.get_df3d_df(split_dir)
+
+                # make df3d videos on full duration of video
+                df3d.df3d_video(split_dir) 
+
+                # add df3d dataframe to main df
+                df3d_dir = os.path.join(split_dir, user_config['df3d_path'])
+                df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
+                combine_df(split_dir, df3d_df_path, log)
+
+                # run fictrac on each split video (if the trial doesn't contain 'noball')
+                if 'noball' not in split_dir:
+                    fictrac.config_and_run_fictrac(split_dir)
+                    _ = fictrac.get_fictrac_df(split_dir)
+
+                    # add fictrac dataframe to main df
+                    fictrac_dir = os.path.join(split_dir, user_config['fictrac_path'])
+                    fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
+                    combine_df(split_dir, fictrac_df_path, log)    
+
+            # join all the split dataframes into one
+            behavior.join_split_df(torun_dict['full_path'])
+
+
+        except Exception as e:
+            raise e
+        return True
 
 
 
