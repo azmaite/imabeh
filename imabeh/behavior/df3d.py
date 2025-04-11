@@ -75,6 +75,7 @@ def run_df3d(trial_dir : str):
     for file in os.listdir(local_images_dir):
         if file.endswith('.jpg'):
             os.system('rm ' + os.path.join(local_images_dir, file))
+    print('done')
     
     # Delete the local data folder created to save the videos (with all the contents)
     exp_dir = os.path.join('/', *local_images_dir.split(os.sep)[:-2])
@@ -115,6 +116,7 @@ def find_df3d_file(directory, type : str = 'result', most_recent=False):
                       "df3d output " + type,
                       most_recent=most_recent)
 
+
 def postprocess_df3d_trial(trial_dir):
     """run post-processing of deepfly3d data as defined in the df3dPostProcessing package:
     Align with reference fly template and calculate leg angles.
@@ -143,6 +145,7 @@ def postprocess_df3d_trial(trial_dir):
     path = pose_result.replace(pose_result_name, 'joint_angles')
     with open(path, 'wb') as f:
         pickle.dump(leg_angles, f)
+
 
 def get_df3d_df(trial_dir):
     """load pose estimation data into a dataframe.
@@ -223,7 +226,8 @@ def get_df3d_df(trial_dir):
     
     return df_out_dir
 
-def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = None):
+
+def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = None, claw : bool = True):
     """ make a video of the 2d and 3d pose estimation after PostProcessing
     Original videos plus 2d tracking points are stacked in a grid with the left legs 
     on top and right legs on the bottom. Below, the 3d pose estimation (after
@@ -240,6 +244,8 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = None):
         starting frame for the video
     end_frame : int
         ending frame for the video. If none, it will be the last frame of the video
+    claw : bool
+        whether to include the claw in the 3d reconstruction or not. Default is true
     """
 
     # get the df3d result file (after post-processing) - including 2d and 3d results
@@ -306,7 +312,7 @@ def df3d_video(trial_dir : str, start_frame : int = 0, end_frame : int = None):
 
 
     ## Make the 3d videos and append
-    videos_3d = _make_df3d_3d(trial_dir, start_frame, end_frame, width)
+    videos_3d = _make_df3d_3d(trial_dir, start_frame, end_frame, width, claw=claw)
     videos.append(videos_3d[0])
     videos.append(videos_3d[1])
     videos.append(videos_3d[2])
@@ -443,7 +449,7 @@ def _plot_df3d_2d(frame, points2d, camera_idx, frame_num, RL):
     return frame
 
 
-def _make_df3d_3d(trial_dir, start_frame, end_frame, width):
+def _make_df3d_3d(trial_dir, start_frame, end_frame, width, claw=True):
     """ make a 3d video of the pose estimation using df3d.
     Uses the POST PROCESSED data resulting from postprocess_df3d_trial, stored in
     the df3d_aligned pkl file. This does not include abdomen (for now).
@@ -461,6 +467,8 @@ def _make_df3d_3d(trial_dir, start_frame, end_frame, width):
     width : int
         width of the output video (height is calculated to maintain aspect ratio) 
         - to match original videos and easily stack under them.
+    claw : bool
+        if True, include the claw in the 3d reconstruction. Default is True.
     
     Returns
     -------
@@ -477,7 +485,10 @@ def _make_df3d_3d(trial_dir, start_frame, end_frame, width):
     legs = ['F', 'M', 'H']
     sides = ['R','L']
     colors = {'L':[[15, 115, 153], [26, 141, 175], [117, 190, 203]], 'R':[[186, 30, 49], [201, 86, 79], [213, 133, 121]]} # LF, LM, LH, RF, RM, RH
-    leg_segments = ['Coxa', 'Femur', 'Tibia', 'Tarsus', 'Claw']
+    if claw:
+        leg_segments = ['Coxa', 'Femur', 'Tibia', 'Tarsus', 'Claw']
+    else:
+        leg_segments = ['Coxa', 'Femur', 'Tibia', 'Tarsus']
     # convert all colors to BGR (OpenCV uses BGR)
     for k in colors.keys():
         for i in range(len(colors[k])):

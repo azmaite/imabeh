@@ -263,6 +263,9 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     """
     This function combines two dataframes by concatenating them along the rows.
     The main dataframe is read (or created) in the trial directory as specificied by user_config.
+    If the two dataframes have the same length, but the frame indexes are different,
+    the new dataframe indexes are ignored (this is useful for when the video is split before
+    running df3d etc.).
     Saves the combined dataframe to the main dataframe path.
 
     Parameters
@@ -294,14 +297,16 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
     
     # check that both df have the same length (number of frames)
     if len(main_df) != len(new_df):
-        if np.abs(len(main_df) - len(new_df)) <=10:
-            raise ValueError("Number of frames in main and new df do not match. \n"+\
-                "Main_df has {} ticks, new_df has {} lines. \n".format(len(main_df), len(new_df))+\
-                "Trial: "+ trial_dir)
+        raise ValueError("Number of frames in main and new df do not match. \n"+\
+            "Main_df has {} ticks, new_df has {} lines. \n".format(len(main_df), len(new_df))+\
+            "Trial: "+ trial_dir)
         
     # get attributes from both dataframes
     both_attrs = main_df.attrs
     both_attrs.update(new_df.attrs)
+
+    # Ensure new_df uses the same index as main_df to ensure proper row-wise concatenation
+    new_df.index = main_df.index
         
     # add new to main_df
     keys_to_add = []
@@ -314,7 +319,7 @@ def combine_df(trial_dir : str, new_df_path : str, log : LogManager):
             main_df = main_df.drop(key, axis=1)
         keys_to_add.append(key)
     main_df = pd.concat([main_df, new_df[keys_to_add]], axis=1)
-    # lof if replaced
+    # log if replaced
     if replaced_keys:
         log.add_line_to_log(f"  Replaced duplicate keys in main processing dataframe at {main_df_path}")
 
