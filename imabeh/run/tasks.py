@@ -24,12 +24,10 @@ pipeline_dict:
 # general imports
 import os
 from datetime import datetime
-import pickle
 
 # imports for the task manager to run
 from imabeh.run.userpaths import LOCAL_DIR, user_config # get the current user configuration (paths and settings)
 from imabeh.run.logmanager import LogManager
-from imabeh.general.main import combine_df
 
 # task specific imports
 from imabeh.imaging2p import utils2p, static2p
@@ -186,43 +184,17 @@ class DfTask(Task):
         self.prerequisites = []
 
     def _run(self, torun_dict, log) -> bool:
-        # check if the main dataframe is already present
-        # if yes, delete and create. If not, create it
-        main_df_path = os.path.join(torun_dict['full_path'], user_config["processed_path"], "processed_df.pkl")
-        if os.path.exists(main_df_path):
-            os.remove(main_df_path)
-        main.get_sync_df(torun_dict['full_path'])
-
-        # add fictrac dataframe if present
         try:
-            fictrac_dir = os.path.join(torun_dict['full_path'], user_config['fictrac_path'])
-            fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
-            combine_df(torun_dict['full_path'], fictrac_df_path, log)
-        except FileNotFoundError:
-            pass
+            # check if the main dataframe is already present
+            # if yes, delete and create. If not, create it
+            main_df_path = os.path.join(torun_dict['full_path'], user_config["processed_path"], "processed_df.pkl")
+            if os.path.exists(main_df_path):
+                os.remove(main_df_path)
+            main.get_sync_df(torun_dict['full_path'])
+        
         except Exception as e:
-            log.add_line_to_log(f"\n   Error combining fictrac dataframe: {e} \n")
-
-        # add df3d dataframe if present
-        try:
-            df3d_dir = os.path.join(torun_dict['full_path'], user_config['df3d_path'])
-            df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
-            combine_df(torun_dict['full_path'], df3d_df_path, log)
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            log.add_line_to_log(f"\n   Error combining df3d dataframe: {e} \n")
-
-        # add sleap dataframe if present
-        try:
-            sleap_dir = os.path.join(torun_dict['full_path'], 'behData/sleap')
-            sleap_df_path = sleap_dir + "/sleap_df.pkl"
-            combine_df(torun_dict['full_path'], sleap_df_path, log)
-        except FileNotFoundError:
-            pass
-        except Exception as e:
-            log.add_line_to_log(f"\n   Error combining df3d dataframe: {e} \n")
-
+            raise e
+        
         return True
 
 class FictracTask(Task):
@@ -233,7 +205,7 @@ class FictracTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "fictrac"
-        self.prerequisites = []
+        self.prerequisites = ['df']
 
     def _run(self, torun_dict, log) -> bool:
         trial_dir = torun_dict['full_path']
@@ -245,7 +217,7 @@ class FictracTask(Task):
             # add fictrac dataframe to main dataframe
             fictrac_dir = os.path.join(trial_dir, user_config['fictrac_path'])
             fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
-            combine_df(trial_dir, fictrac_df_path, log)
+            main.combine_df(trial_dir, fictrac_df_path, log)
 
         except Exception as e:
             raise e
@@ -260,7 +232,7 @@ class Df3dTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "df3d"
-        self.prerequisites = []
+        self.prerequisites = ['df']
 
     def _run(self, torun_dict, log) -> bool:
         trial_dir = torun_dict['full_path']
@@ -273,9 +245,10 @@ class Df3dTask(Task):
             # add df3d dataframe to main df
             df3d_dir = os.path.join(trial_dir, user_config['df3d_path'])
             df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
-            combine_df(trial_dir, df3d_df_path, log)
+            main.combine_df(trial_dir, df3d_df_path, log)
 
             # make df3d videos on a subset of frames (aiming to get stimulation period)
+            print('making video...')
             df3d.df3d_video(trial_dir, start_frame=700, end_frame=1100) 
 
         except Exception as e:
@@ -290,7 +263,7 @@ class SleapTask(Task):
     def __init__(self):
         super().__init__()
         self.name = "sleap"
-        self.prerequisites = []
+        self.prerequisites = ['df']
 
     def _run(self, torun_dict, log) -> bool:
         trial_dir = torun_dict['full_path']
@@ -302,7 +275,7 @@ class SleapTask(Task):
             # add sleap dataframe to main df
             sleap_dir = os.path.join(trial_dir, 'behData/sleap')
             sleap_df_path = sleap_dir + "/sleap_df.pkl"
-            combine_df(trial_dir, sleap_df_path, log)
+            main.combine_df(trial_dir, sleap_df_path, log)
 
         except Exception as e:
             raise e
@@ -369,18 +342,26 @@ class SplitBehTask(Task):
             for split in split_list:
                 split_dir = os.path.join(trial_images_dir, split)
 
-                # run df3d on each split video
-                df3d.run_df3d(split_dir)
-                df3d.postprocess_df3d_trial(split_dir)
-                df3d.get_df3d_df(split_dir)
+                try:
 
-                # make df3d videos on full duration of video
-                df3d.df3d_video(split_dir) 
+                    # run df3d on each split video
+                    df3d.run_df3d(split_dir)
+                    print('df3d done, postprocessing')
+                    df3d.postprocess_df3d_trial(split_dir)
+                    print('postprocessing done, getting df')
+                    df3d.get_df3d_df(split_dir)
 
-                # add df3d dataframe to main df
-                df3d_dir = os.path.join(split_dir, user_config['df3d_path'])
-                df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
-                combine_df(split_dir, df3d_df_path, log)
+                    # make df3d videos on full duration of video
+                    print('making video...')
+                    #df3d.df3d_video(split_dir) 
+
+                    # add df3d dataframe to main df
+                    df3d_dir = os.path.join(split_dir, user_config['df3d_path'])
+                    df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
+                    main.combine_df(split_dir, df3d_df_path, log)
+                
+                except Exception as e:
+                    log.add_line_to_log(f"  Failed df3d for {split}")
 
                 # run fictrac on each split video (if the trial doesn't contain 'noball')
                 if 'noball' not in split_dir:
@@ -390,10 +371,10 @@ class SplitBehTask(Task):
                     # add fictrac dataframe to main df
                     fictrac_dir = os.path.join(split_dir, user_config['fictrac_path'])
                     fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
-                    combine_df(split_dir, fictrac_df_path, log)    
+                    main.combine_df(split_dir, fictrac_df_path, log)    
 
             # join all the split dataframes into one
-            behavior.join_split_df(torun_dict['full_path'])
+            behavior.join_split_df(torun_dict['full_path'], log)
 
 
         except Exception as e:
