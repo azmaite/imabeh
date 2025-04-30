@@ -36,6 +36,13 @@ def run_df3d(trial_dir : str):
         df3d will be saved within this trial folder as specified in the user_config
     """
 
+    # clean the temporary local folder contents (in case old files are there)
+    local_data = user_config["local_data"]
+    try:
+        os.system(f"rm -r {local_data}/*")
+    except:
+        pass
+
     # Prepare the data for df3d by copying the images to the local data folder
     # this will make it faster to run df3d
     # output is a local folder with the images

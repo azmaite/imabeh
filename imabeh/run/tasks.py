@@ -191,6 +191,26 @@ class DfTask(Task):
             if os.path.exists(main_df_path):
                 os.remove(main_df_path)
             main.get_sync_df(torun_dict['full_path'])
+
+            trial_dir = torun_dict['full_path']
+
+            # add fictrac dataframe to main dataframe
+            fictrac_dir = os.path.join(trial_dir, user_config['fictrac_path'])
+            try:
+                fictrac_df_path = main.find_file(fictrac_dir, "fictrac_df.pkl", "fictrac df")
+                main.combine_df(trial_dir, fictrac_df_path, log)
+            except FileNotFoundError:
+                pass
+
+            # add df3d dataframe to main df
+            df3d_dir = os.path.join(trial_dir, user_config['df3d_path'])
+            try:
+                df3d_df_path = main.find_file(df3d_dir, "df3d_df.pkl", "df3d df")
+                main.combine_df(trial_dir, df3d_df_path, log)
+            except FileNotFoundError:
+                pass
+
+
         
         except Exception as e:
             raise e
