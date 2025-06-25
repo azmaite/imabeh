@@ -38,10 +38,8 @@ def run_df3d(trial_dir : str):
 
     # clean the temporary local folder contents (in case old files are there)
     local_data = user_config["local_data"]
-    try:
+    if len(local_data) > 0 and os.path.isdir(local_data):
         os.system(f"rm -r {local_data}/*")
-    except:
-        pass
 
     # Prepare the data for df3d by copying the images to the local data folder
     # this will make it faster to run df3d
@@ -139,19 +137,27 @@ def postprocess_df3d_trial(trial_dir):
     pose_result_name = "df3d_result"
 
     # run df3d post-processing
-    mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True, outlier_correction=True)
-    
+    try:
+        mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True, outlier_correction=True)
+        print('Done with df3d post-processing.')
+    except:
+        print('df3d post-processing failed. Trying without outlier correction....')
+        mydf3dPostProcess = df3dPostProcess(exp_dir=pose_result, calculate_3d=True, outlier_correction=False)
+        print('Done with df3d post-processing (outlier correction = False).')
+
     # align model and save
     aligned_model = mydf3dPostProcess.align_to_template(interpolate=False, scale=True, all_body=True)
     path = pose_result.replace(pose_result_name,'aligned_pose')
     with open(path, 'wb') as f:
         pickle.dump(aligned_model, f)
+    print('Done aligning model')
 
     # calculate leg angles and save
     leg_angles = mydf3dPostProcess.calculate_leg_angles(save_angles=False)
     path = pose_result.replace(pose_result_name, 'joint_angles')
     with open(path, 'wb') as f:
         pickle.dump(leg_angles, f)
+    print('Done calculating leg angles')
 
 
 def get_df3d_df(trial_dir):
